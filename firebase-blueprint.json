@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the GuruPintar application.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the user" },
+        "nip": { "type": "string", "description": "NIP of the user" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "Role of the user" },
+        "status": { "type": "string", "enum": ["aktif", "nonaktif"], "description": "Status of the user" },
+        "schoolName": { "type": "string", "description": "Name of the school" },
+        "principalName": { "type": "string", "description": "Name of the principal" },
+        "principalNip": { "type": "string", "description": "NIP of the principal" },
+        "location": { "type": "string", "description": "Location/City" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "status"]
+    },
+    "RPM": {
+      "title": "RPM",
+      "description": "Rencana Pembelajaran Mendalam",
+      "type": "object",
+      "properties": {
+        "email_guru": { "type": "string", "format": "email" },
+        "mapel": { "type": "string" },
+        "fase": { "type": "string" },
+        "konten": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email_guru", "mapel", "fase", "konten"]
+    },
+    "HelpEntry": {
+      "title": "HelpEntry",
+      "description": "An entry in the Help Center (FAQ or Contact).",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the help entry" },
+        "content": { "type": "string", "description": "Content or value of the help entry" },
+        "type": { "type": "string", "enum": ["contact", "faq"], "description": "Type of help entry" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "type", "createdAt"]
+    },
+    "ActivationCode": {
+      "title": "ActivationCode",
+      "description": "A code used to activate a PRO subscription.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "The activation code string" },
+        "durationDays": { "type": "number", "description": "Duration of the subscription in days" },
+        "isUsed": { "type": "boolean", "description": "Whether the code has been used" },
+        "usedBy": { "type": "string", "description": "Email of the user who used the code" },
+        "usedAt": { "type": "string", "format": "date-time", "description": "When the code was used" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the code was created" },
+        "createdBy": { "type": "string", "description": "Email of the admin who created the code" }
+      },
+      "required": ["code", "durationDays", "isUsed", "createdAt", "createdBy"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "rpm/{rpmId}": {
+      "schema": { "$ref": "#/entities/RPM" },
+      "description": "Stores learning plans."
+    },
+    "help_center/{itemId}": {
+      "schema": { "$ref": "#/entities/HelpEntry" },
+      "description": "Stores help center entries."
+    },
+    "activation_codes/{codeId}": {
+      "schema": { "$ref": "#/entities/ActivationCode" },
+      "description": "Stores activation codes for PRO subscriptions."
+    }
+  }
+}

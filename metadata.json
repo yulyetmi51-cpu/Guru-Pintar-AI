@@ -1,0 +1,5 @@
+{
+  "name": "RPM Generator",
+  "description": "A web application to generate Rencana Pembelajaran Mendalam (RPM) or lesson plans based on curriculum expert guidelines.",
+  "requestFramePermissions": []
+}

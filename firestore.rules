@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is authenticated
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+
+    // Check if user is an admin
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          request.auth.token.email == "ps.erik007@gmail.com" ||
+          request.auth.token.email == "admin@gurupintar.com"
+        );
+    }
+
+    function isOwner(userId) {
+       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'status']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string &&
+             data.role in ['admin', 'user'] &&
+             data.status in ['aktif', 'nonaktif'] &&
+             (!('sisa_token' in data) || data.sisa_token is number) &&
+             (!('last_reset' in data) || data.last_reset is string) &&
+             (!('subscription' in data) || data.subscription in ['free', 'pro']) &&
+             (!('subscriptionExpiry' in data) || data.subscriptionExpiry == null || data.subscriptionExpiry is string) &&
+             (!('nip' in data) || data.nip is string) &&
+             (!('schoolName' in data) || data.schoolName is string) &&
+             (!('principalName' in data) || data.principalName is string) &&
+             (!('principalNip' in data) || data.principalNip is string) &&
+             (!('location' in data) || data.location is string);
+    }
+
+    function isValidRPM(data) {
+      return data.keys().hasAll(['email_guru', 'mapel', 'fase', 'konten']) &&
+             data.email_guru is string &&
+             data.mapel is string && data.mapel.size() < 100 &&
+             data.fase is string && data.fase.size() < 50 &&
+             data.konten is string && data.konten.size() < 50000;
+    }
+
+    function isValidHelpEntry(data) {
+      return data.keys().hasAll(['title', 'content', 'type', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.type in ['contact', 'faq'] &&
+             data.createdAt is string;
+    }
+
+    function isValidActivationCode(data) {
+      return data.keys().hasAll(['code', 'duration', 'tokensPerMonth', 'status', 'createdAt']) &&
+             data.code is string && data.code.size() > 0 && data.code.size() < 50 &&
+             data.duration is number && data.duration > 0 &&
+             data.tokensPerMonth is number && data.tokensPerMonth > 0 &&
+             data.status in ['unused', 'used'] &&
+             data.createdAt is string &&
+             (!('usedBy' in data) || data.usedBy is string) &&
+             (!('usedAt' in data) || data.usedAt is string);
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Allow any authenticated user to read profiles (for admin panel or display names)
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (
+                      (isOwner(userId) && request.resource.data.role == 'user') || 
+                      (isOwner(userId) && request.resource.data.role == 'admin' && request.auth.token.email == 'admin@gurupintar.com') ||
+                      isAdmin()
+                    );
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (
+                      isAdmin() ||
+                      (
+                        isOwner(userId) && 
+                        request.resource.data.role == resource.data.role &&
+                        request.resource.data.email == resource.data.email &&
+                        request.resource.data.status == resource.data.status
+                      )
+                    );
+      allow delete: if isAdmin();
+    }
+
+    match /rpm/{rpmId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRPM(request.resource.data) && 
+                    request.resource.data.email_guru == request.auth.token.email;
+      allow update: if isAuthenticated() && isValidRPM(request.resource.data) && 
+                    resource.data.email_guru == request.auth.token.email &&
+                    request.resource.data.email_guru == resource.data.email_guru;
+      allow delete: if isAuthenticated() && resource.data.email_guru == request.auth.token.email;
+    }
+
+    match /help_center/{itemId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidHelpEntry(request.resource.data);
+      allow update: if isAdmin() && isValidHelpEntry(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /activation_codes/{codeId} {
+      allow get: if isAuthenticated();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidActivationCode(request.resource.data);
+      allow update: if isAuthenticated() && isValidActivationCode(request.resource.data) &&
+                    (isAdmin() || 
+                     (resource.data.status == 'unused' && 
+                      request.resource.data.status == 'used' && 
+                      request.resource.data.usedBy == request.auth.uid &&
+                      request.resource.data.code == resource.data.code &&
+                      request.resource.data.duration == resource.data.duration &&
+                      request.resource.data.tokensPerMonth == resource.data.tokensPerMonth &&
+                      request.resource.data.createdAt == resource.data.createdAt
+                     )
+                    );
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+  }
+}

@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@layer base {
+  @media screen {
+    .prose div[style*="page-break-before: always"] {
+      border-top: 2px dashed #e5e7eb;
+      margin: 40px -20mm;
+      position: relative;
+      height: 0;
+      clear: both;
+    }
+    .prose div[style*="page-break-before: always"]::after {
+      content: "Halaman Baru";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffffff;
+      padding: 0 10px;
+      font-size: 10px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      z-index: 10;
+    }
+  }
+}
