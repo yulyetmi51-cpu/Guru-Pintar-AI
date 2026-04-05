@@ -5,6 +5,7 @@ import fs from "fs-extra";
 import { glob } from "glob";
 import { Octokit } from "octokit";
 import dotenv from "dotenv";
+import HTMLtoDOCX from "html-to-docx";
 
 dotenv.config();
 
@@ -17,6 +18,32 @@ async function startServer() {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // API Route for DOCX Generation
+  app.post("/api/generate-docx", async (req, res) => {
+    try {
+      const { html } = req.body;
+      if (!html) {
+        return res.status(400).json({ error: "HTML content is required" });
+      }
+
+      const fileBuffer = await HTMLtoDOCX(html, null, {
+        margins: {
+          top: 1440,
+          right: 1440,
+          bottom: 1440,
+          left: 1440,
+        }
+      });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename="document.docx"');
+      res.send(fileBuffer);
+    } catch (error: any) {
+      console.error("Error generating DOCX:", error);
+      res.status(500).json({ error: error.message || "Failed to generate DOCX" });
+    }
   });
 
   // API Route for GitHub Sync

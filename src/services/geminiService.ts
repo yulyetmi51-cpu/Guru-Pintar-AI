@@ -221,11 +221,11 @@ Struktur Output yang WAJIB Diikuti (Gunakan format HTML Kuno/Klasik agar tampila
 [Tuliskan CP yang relevan]</p>
 
 <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Tujuan Pembelajaran (TP)</strong></p>
-<ol style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li>Menjelaskan pengertian dan fungsi...</li>
   <li>Mengidentifikasi aturan...</li>
   <li>Menggunakan...</li>
-</ol>
+</ul>
 
 <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Pemahaman Bermakna</strong><br/>
 [Tuliskan pesan moral atau inti materi yang akan diingat siswa selamanya, relevan dengan kehidupan sehari-hari]</p>
@@ -353,7 +353,7 @@ C. Penilaian Pengetahuan<br/>
 </table>
 </div>
 
-Gaya Bahasa: Gunakan bahasa yang edukatif, suportif, dan instruksi yang jelas bagi guru. Pastikan setiap langkah mencerminkan nilai-nilai karakter dan profil lulusan. Sesuaikan isi dengan Topik/Materi yang diminta pengguna. WAJIB gunakan tag <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"> untuk setiap paragraf biasa.`;
+Gaya Bahasa: Gunakan bahasa yang edukatif, suportif, dan instruksi yang jelas bagi guru. Pastikan setiap langkah mencerminkan nilai-nilai karakter dan profil lulusan. Sesuaikan isi dengan Topik/Materi yang diminta pengguna. WAJIB gunakan tag <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"> untuk setiap paragraf biasa. WAJIB gunakan tag <ul> atau <ol> beserta <li> untuk setiap daftar, poin-poin, tujuan pembelajaran, pertanyaan pemantik, dan sejenisnya. JANGAN HANYA menggunakan enter (baris baru) untuk memisahkan poin-poin.`;
 
 export async function generateRPM(
   topic: string | string[],
@@ -411,7 +411,7 @@ NIP Penyusun: ${nipGuru || '[NIP Penyusun]'}
 Tempat: ${tempat || '[Tempat]'}
 Tanggal: ${tanggal || '[Tanggal]'}
 
-PENTING: Jika ada lampiran yang diminta di bawah ini, tambahkan bagian <div class="page-break" style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">LAMPIRAN</h3> tepat SETELAH bagian Tanda Tangan (di paling akhir dokumen). Lalu masukkan lampiran-lampiran tersebut di bawahnya dengan sub-judul (misal: <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">1. Materi Ajar</h4>). 
+PENTING: Jika ada lampiran yang diminta di bawah ini, tambahkan bagian <div class="page-break" style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">LAMPIRAN</h3> tepat SETELAH bagian Tanda Tangan (di paling akhir dokumen). Lalu masukkan lampiran-lampiran tersebut di bawahnya.
 
 PENTING: Seluruh isi lampiran (Materi Ajar, LKPD, Asesmen) WAJIB dibungkus dalam tag <div class="appendix-section">...</div> dan gunakan format RATA KIRI KANAN (Justify) dengan font Arial 12pt untuk semua teks di dalamnya. Pisahkan setiap lampiran dengan halaman baru menggunakan tag <div class="page-break" style="page-break-before: always;"></div>.
 
@@ -420,9 +420,9 @@ PENTING: Pastikan bagian Tanda Tangan dibungkus dengan <div class="avoid-page-br
 ${asesmenWithImages ? 'INSTRUKSI SANGAT KRITIKAL: Anda WAJIB MENYISIPKAN MINIMAL 3 GAMBAR ILUSTRASI di dalam dokumen ini (bisa di Materi, LKPD, atau Asesmen). Untuk menyisipkan gambar, Anda HARUS menuliskan kode ini persis seperti ini: [AI_IMAGE_PROMPT: deskripsi gambar yang detail dalam bahasa inggris]. JANGAN gunakan tag <img>, HANYA gunakan format kurung siku tersebut. Jika Anda tidak menyisipkan kode ini, sistem akan gagal.' : ''}
 
 BAGIAN LAMPIRAN:
-${includeMateri ? '- Tambahkan lampiran "Materi Ajar": Berisi ringkasan materi ajar yang relevan dengan topik. Awali dengan <div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Materi Ajar</h4>' : '- DILARANG KERAS membuat lampiran "Materi Ajar". JANGAN menuliskan kata "Materi Ajar" di bagian lampiran.'}
-${includeLKPD ? '- Tambahkan lampiran "Lembar Kerja Peserta Didik (LKPD)": Berisi aktivitas atau tugas untuk siswa. Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Lembar Kerja Peserta Didik (LKPD)</h4>. WAJIB berikan nomor pada setiap soal/tugas.' : '- DILARANG KERAS membuat lampiran "LKPD". JANGAN menuliskan kata "LKPD" di bagian lampiran.'}
-${includeAsesmen ? `- Tambahkan lampiran "Asesmen": Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Asesmen</h4>
+${includeMateri ? '- Tambahkan lampiran "Materi Ajar": Berisi ringkasan materi ajar yang relevan dengan topik. Awali dengan <div class="appendix-section"><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">MATERI AJAR</h3>' : '- DILARANG KERAS membuat lampiran "Materi Ajar". JANGAN menuliskan kata "Materi Ajar" di bagian lampiran.'}
+${includeLKPD ? '- Tambahkan lampiran "Lembar Kerja Peserta Didik (LKPD)": Berisi aktivitas atau tugas untuk siswa. Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">LEMBAR KERJA PESERTA DIDIK (LKPD)</h3>. WAJIB berikan nomor pada setiap soal/tugas.' : '- DILARANG KERAS membuat lampiran "LKPD". JANGAN menuliskan kata "LKPD" di bagian lampiran.'}
+${includeAsesmen ? `- Tambahkan lampiran "Asesmen": Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">ASESMEN</h3>
   - Tipe Asesmen: ${asesmenType}
   - Jumlah Soal: ${asesmenCount}
   - Tipe Soal: ${asesmenTypesStr.join(', ')}
@@ -439,8 +439,8 @@ ${includeAsesmen ? `- Tambahkan lampiran "Asesmen": Awali dengan <div class="pag
     * Menjodohkan: Gunakan format daftar (list) ke bawah, bukan dipisahkan dengan koma ke samping.
   Buatkan soal-soal asesmen sesuai dengan kriteria di atas.
   
-  SETELAH SEMUA SOAL SELESAI, buatlah sub-judul <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Kunci Jawaban</h4> dan tuliskan kunci jawaban secara terpisah dan rapi.
-  SETELAH KUNCI JAWABAN, buatlah sub-judul <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Rubrik Penilaian Sikap & Keterampilan</h4> dan buatkan tabel rubrik penilaian sikap dan keterampilan yang relevan dengan topik dan aktivitas.</div>` : '- DILARANG KERAS membuat lampiran "Asesmen". JANGAN menuliskan kata "Asesmen" di bagian lampiran.'}
+  SETELAH SEMUA SOAL SELESAI, buatlah sub-judul <h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">KUNCI JAWABAN</h3> dan tuliskan kunci jawaban secara terpisah dan rapi.
+  SETELAH KUNCI JAWABAN, buatlah sub-judul <h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">RUBRIK PENILAIAN SIKAP & KETERAMPILAN</h3> dan buatkan tabel rubrik penilaian sikap dan keterampilan yang relevan dengan topik dan aktivitas.</div>` : '- DILARANG KERAS membuat lampiran "Asesmen". JANGAN menuliskan kata "Asesmen" di bagian lampiran.'}
 ${includeMateri || includeLKPD || includeAsesmen ? '</div>' : ''}
 
 PENTING: Hanya buat lampiran yang diinstruksikan di atas. Jika ada instruksi "DILARANG KERAS", maka bagian tersebut TIDAK BOLEH ada di dalam output Anda sama sekali.

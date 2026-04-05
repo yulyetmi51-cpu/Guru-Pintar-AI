@@ -89,6 +89,8 @@ export default function RPMGenerator() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [isSavingToHistory, setIsSavingToHistory] = useState(false);
+  const [isDownloadingWord, setIsDownloadingWord] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   // Load Profile from Firestore
   useEffect(() => {
@@ -439,60 +441,41 @@ export default function RPMGenerator() {
       let extension: string;
       
       if (type === 'doc') {
-        extension = 'doc';
-        // Prepare HTML for Word (similar to handleDownloadWord)
+        extension = 'docx';
+        
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = generatedRPM;
-        const clone = tempDiv;
         
-        const tables = clone.querySelectorAll('table');
+        const allElements = tempDiv.querySelectorAll('*');
+        allElements.forEach(el => {
+          const attrs = Array.from(el.attributes);
+          attrs.forEach(attr => {
+            if (!['colspan', 'rowspan', 'src', 'alt', 'border'].includes(attr.name)) {
+              el.removeAttribute(attr.name);
+            }
+          });
+        });
+
+        const tables = tempDiv.querySelectorAll('table');
         tables.forEach(table => {
-          const t = table as HTMLElement;
-          t.style.width = '100%';
-          t.style.borderCollapse = 'collapse';
-          t.style.marginBottom = '16pt';
           table.setAttribute('border', '1');
-          t.style.fontFamily = 'Arial, sans-serif';
-          t.style.fontSize = '12pt';
         });
 
-        const cells = clone.querySelectorAll('th, td');
-        cells.forEach(cell => {
-          const c = cell as HTMLElement;
-          c.style.border = '1px solid black';
-          c.style.padding = '8px';
-          c.style.verticalAlign = 'top';
-        });
-
-        const headings = clone.querySelectorAll('h3');
-        headings.forEach(h3 => {
-          const h = h3 as HTMLElement;
-          h.style.backgroundColor = '#87CEEB';
-          h.style.border = '1px solid black';
-          h.style.padding = '8px';
-          h.style.textAlign = 'center';
-          h.style.marginTop = '24pt';
-          h.style.marginBottom = '16pt';
-          h.style.fontSize = '14pt';
-          h.style.fontFamily = 'Arial, sans-serif';
-        });
-
-        const paragraphs = clone.querySelectorAll('p, li');
-        paragraphs.forEach(p => {
-          const el = p as HTMLElement;
-          el.style.textAlign = 'justify';
-          el.style.fontFamily = 'Arial, sans-serif';
-          el.style.fontSize = '12pt';
-          el.style.lineHeight = '1.5';
-        });
-
-        const html = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'><title>RPM</title></head>
-        <body><div class="WordSection1">${clone.innerHTML}</div></body>
-        </html>`;
+        const cleanHtml = tempDiv.innerHTML;
+        const docxHtml = `<div>${cleanHtml}</div>`;
         
-        blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const response = await fetch('/api/generate-docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: docxHtml }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to generate DOCX');
+        }
+        
+        blob = await response.blob();
       } else {
         extension = 'pdf';
         const pdfHtml = `
@@ -569,113 +552,57 @@ export default function RPMGenerator() {
     const htmlContent = contentToDownload || generatedRPM;
     if (!htmlContent) return;
     
-    // Create a temporary element to hold the HTML content
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    const clone = tempDiv;
-    
-    // Inject inline styles for Word compatibility
-    const tables = clone.querySelectorAll('table');
-    tables.forEach(table => {
-      const t = table as HTMLElement;
-      t.style.width = '100%';
-      t.style.borderCollapse = 'collapse';
-      t.style.marginBottom = '16pt';
-      table.setAttribute('border', '1');
-      t.style.fontFamily = 'Arial, sans-serif';
-      t.style.fontSize = '12pt';
-    });
-
-    const cells = clone.querySelectorAll('th, td');
-    cells.forEach(cell => {
-      const c = cell as HTMLElement;
-      c.style.border = '1px solid black';
-      c.style.padding = '8px';
-      c.style.verticalAlign = 'top';
-    });
-
-    const headings = clone.querySelectorAll('h3');
-    headings.forEach(h3 => {
-      const h = h3 as HTMLElement;
-      h.style.backgroundColor = '#87CEEB';
-      h.style.border = '1px solid black';
-      h.style.padding = '8px';
-      h.style.textAlign = 'center';
-      h.style.marginTop = '24pt';
-      h.style.marginBottom = '16pt';
-      h.style.fontSize = '14pt';
-      h.style.fontFamily = 'Arial, sans-serif';
-    });
-
-    const paragraphs = clone.querySelectorAll('p, li');
-    paragraphs.forEach(p => {
-      const el = p as HTMLElement;
-      el.style.textAlign = 'justify';
-      el.style.fontFamily = 'Arial, sans-serif';
-      el.style.fontSize = '12pt';
-      el.style.lineHeight = '1.5';
-    });
-
-    // Cari semua elemen page-break dan ganti dengan tag khusus MSO
-    const pageBreaks = clone.querySelectorAll('.page-break, [style*="page-break-before: always"]');
-    pageBreaks.forEach(el => {
-      const msoBreak = document.createElement('br');
-      msoBreak.setAttribute('clear', 'all');
-      msoBreak.setAttribute('style', 'mso-special-character:line-break;page-break-before:always');
-      if (el.parentNode) {
-        el.parentNode.replaceChild(msoBreak, el);
-      }
-    });
-
-    const content = clone.innerHTML;
-
-    const html = `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head>
-      <meta charset='utf-8'>
-      <title>Rencana Pembelajaran Mendalam</title>
-      <style>
-        @page WordSection1 {
-          size: ${paperSize === 'F4' ? '8.5in 13in' : '595.3pt 841.9pt'};
-          margin: ${pageMargin === 'narrow' ? '36.0pt 36.0pt 36.0pt 36.0pt' : pageMargin === 'wide' ? '72.0pt 72.0pt 72.0pt 72.0pt' : '56.7pt 56.7pt 56.7pt 56.7pt'};
-          mso-header-margin: 35.4pt;
-          mso-footer-margin: 35.4pt;
-          mso-paper-source: 0;
-        }
-        div.WordSection1 { page: WordSection1; }
-        body { font-family: 'Arial', sans-serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black; }
-        p, li { margin-top: 0pt; margin-bottom: 8pt; text-align: justify; font-family: 'Arial', sans-serif; font-size: 12pt; }
-        ul, ol { margin-top: 0pt; margin-bottom: 16pt; text-align: justify; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 16pt; border: 1px solid black; page-break-inside: avoid; font-family: 'Arial', sans-serif; font-size: 12pt; }
-        tr { page-break-inside: avoid; page-break-after: auto; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; vertical-align: top; }
-        .no-border, .no-border th, .no-border td { border: none !important; }
-        h3 { background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-size: 14pt; font-family: 'Arial', sans-serif; page-break-after: avoid; }
-        h4 { font-size: 12pt; margin-top: 16pt; margin-bottom: 8pt; page-break-after: avoid; font-family: 'Arial', sans-serif; font-weight: bold; }
-        h1, h2, h5, h6 { page-break-after: avoid; font-family: 'Arial', sans-serif; }
-      </style>
-    </head>
-    <body>
-      <div class="WordSection1">
-        ${content}
-      </div>
-    </body>
-    </html>`;
-
+    setIsDownloadingWord(true);
     try {
-      const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      
+      const allElements = tempDiv.querySelectorAll('*');
+      allElements.forEach(el => {
+        const attrs = Array.from(el.attributes);
+        attrs.forEach(attr => {
+          if (!['colspan', 'rowspan', 'src', 'alt', 'border'].includes(attr.name)) {
+            el.removeAttribute(attr.name);
+          }
+        });
+      });
+
+      const tables = tempDiv.querySelectorAll('table');
+      tables.forEach(table => {
+        table.setAttribute('border', '1');
+      });
+
+      const cleanHtml = tempDiv.innerHTML;
+      const docxHtml = `<div>${cleanHtml}</div>`;
+
+      const response = await fetch('/api/generate-docx', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ html: docxHtml }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to generate DOCX');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.doc`;
-      
+      link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.docx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error generating .doc:", error);
-      alert("Gagal mengunduh file Word. Silakan coba lagi.");
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error("Error generating .docx:", error);
+      alert("Gagal mengunduh file Word: " + (error.message || "Pastikan server backend berjalan."));
+    } finally {
+      setIsDownloadingWord(false);
+      setShowDownloadMenu(false);
     }
   };
 
@@ -685,12 +612,15 @@ export default function RPMGenerator() {
     
     // Create a styled HTML string for PDF rendering
     const pdfHtml = `
-      <div class="markdown-body" style="font-family: Arial, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
+      <div class="markdown-body" style="font-family: Arial, Helvetica, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
         <style>
-          h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; }
-          th, td { border: 1px solid black; padding: 8px; vertical-align: top; }
-          img { max-width: 100%; height: auto; }
+          h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; page-break-after: avoid; }
+          h4, h5, h6 { page-break-after: avoid; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; table-layout: fixed; word-wrap: break-word; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          th, td { border: 1px solid black; padding: 8px; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; }
+          img { max-width: 100%; height: auto; page-break-inside: avoid; }
+          p, li { page-break-inside: avoid; }
         </style>
         ${htmlContent}
       </div>
@@ -702,9 +632,9 @@ export default function RPMGenerator() {
       margin:       marginVal,
       filename:     `RPM_${subject}_${grade}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF:        { unit: 'mm', format: paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
-      pagebreak:    { mode: ['css', 'legacy', 'avoid-all'] }
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
+      jsPDF:        { unit: 'mm', format: paperSize.toLowerCase() === 'f4' ? [210, 330] : paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
     try {
@@ -712,6 +642,8 @@ export default function RPMGenerator() {
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Gagal mengunduh PDF. Silakan coba lagi.");
+    } finally {
+      setShowDownloadMenu(false);
     }
   };
 
@@ -1477,22 +1409,41 @@ export default function RPMGenerator() {
 
                 {generatedRPM && (
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleDownloadPDF()}
-                      className="flex items-center gap-2 px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-medium text-sm shadow-sm"
-                      title="Unduh PDF"
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span className="hidden md:inline">PDF</span>
-                    </button>
-                    <button
-                      onClick={() => handleDownloadWord()}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm"
-                      title="Unduh Word (.doc)"
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span className="hidden md:inline">Word (.doc)</span>
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                        disabled={isDownloadingWord}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm disabled:opacity-70"
+                        title="Unduh Dokumen"
+                      >
+                        {isDownloadingWord ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        <span className="hidden md:inline">{isDownloadingWord ? 'Memproses...' : 'Unduh Dokumen'}</span>
+                        <ChevronDown className="w-4 h-4 ml-1" />
+                      </button>
+
+                      {showDownloadMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-stone-200 rounded-xl shadow-xl z-30 overflow-hidden">
+                          <button
+                            onClick={() => handleDownloadWord()}
+                            className="w-full text-left px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-sm font-medium text-stone-700 border-b border-stone-100"
+                          >
+                            <div className="w-8 h-8 rounded bg-blue-100 text-blue-600 flex items-center justify-center">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            Word (.docx)
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPDF()}
+                            className="w-full text-left px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-sm font-medium text-stone-700"
+                          >
+                            <div className="w-8 h-8 rounded bg-rose-100 text-rose-600 flex items-center justify-center">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            PDF (.pdf)
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     <div className="w-px h-6 bg-stone-200 mx-1 hidden sm:block" />
 
@@ -1636,6 +1587,8 @@ export default function RPMGenerator() {
                       margin-bottom: 1rem;
                       border: 1px solid black;
                       page-break-inside: avoid;
+                      table-layout: fixed;
+                      word-wrap: break-word;
                     }
                     .preview-paper tr {
                       page-break-inside: avoid;
@@ -1646,6 +1599,8 @@ export default function RPMGenerator() {
                       padding: 12px;
                       text-align: left;
                       vertical-align: top;
+                      overflow-wrap: break-word;
+                      word-wrap: break-word;
                     }
                     .preview-paper .no-border, .preview-paper .no-border th, .preview-paper .no-border td {
                       border: none !important;
