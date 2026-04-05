@@ -58,9 +58,10 @@ import { handleFirestoreError, OperationType } from '../utils/errorHandling';
 interface AdminDashboardProps {
   onLogout: () => void;
   user: User;
+  onSwitchToUserMode: () => void;
 }
 
-export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) {
+export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: AdminDashboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [helpEntries, setHelpEntries] = useState<HelpEntry[]>([]);
   const [currentView, setCurrentView] = useState<'dashboard' | 'users' | 'help' | 'settings' | 'codes'>('dashboard');
@@ -92,8 +93,14 @@ export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) 
     allowRegistration: true,
     aiProvider: 'gemini',
     geminiApiKeys: [''],
-    openRouterApiKeys: ['']
+    openRouterApiKeys: [''],
+    githubPat: '',
+    githubRepo: '',
+    githubBranch: 'main'
   });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{success: boolean, message: string} | null>(null);
 
   // Notifications State
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -181,7 +188,10 @@ export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) 
           ...prev, 
           ...data,
           geminiApiKeys: data.geminiApiKeys?.length ? data.geminiApiKeys : [''],
-          openRouterApiKeys: data.openRouterApiKeys?.length ? data.openRouterApiKeys : ['']
+          openRouterApiKeys: data.openRouterApiKeys?.length ? data.openRouterApiKeys : [''],
+          githubPat: data.githubPat || '',
+          githubRepo: data.githubRepo || '',
+          githubBranch: data.githubBranch || 'main'
         }));
       }
     } catch (err) {
@@ -256,6 +266,61 @@ export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) 
       alert("Gagal menyimpan pengaturan.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSyncToGithub = async () => {
+    console.log("Sync button clicked. Current settings:", {
+      pat: systemSettings.githubPat ? "SET" : "EMPTY",
+      repo: systemSettings.githubRepo,
+      branch: systemSettings.githubBranch
+    });
+
+    // Basic validation
+    if (!systemSettings.githubPat || !systemSettings.githubRepo) {
+      alert("Harap isi GitHub PAT dan Repository URL terlebih dahulu.");
+      return;
+    }
+
+    if (!systemSettings.githubRepo.includes("/")) {
+      alert("Format Repository URL salah. Gunakan format 'username/nama-repo'.");
+      return;
+    }
+
+    // Start syncing state immediately
+    setIsSyncing(true);
+    setSyncResult(null);
+
+    try {
+      console.log("Starting GitHub sync request to /api/github/sync...");
+      const response = await fetch("/api/github/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pat: systemSettings.githubPat,
+          repo: systemSettings.githubRepo,
+          branch: systemSettings.githubBranch,
+          message: `Sync from Admin Panel at ${new Date().toLocaleString('id-ID')}`
+        }),
+      });
+
+      console.log("Response received from server:", response.status);
+      const result = await response.json();
+      console.log("Result data:", result);
+
+      if (response.ok) {
+        setSyncResult({ success: true, message: "Berhasil menyinkronkan kode ke GitHub!" });
+      } else {
+        setSyncResult({ success: false, message: result.error || "Gagal menyinkronkan ke GitHub." });
+      }
+    } catch (error: any) {
+      console.error("Sync Error:", error);
+      setSyncResult({ success: false, message: "Terjadi kesalahan jaringan atau server. Pastikan server backend berjalan." });
+    } finally {
+      setIsSyncing(false);
+      console.log("Sync process finished.");
     }
   };
 
@@ -638,6 +703,15 @@ export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) 
               >
                 <Settings className="w-5 h-5" />
                 Pengaturan Sistem
+              </button>
+            </li>
+            <li className="pt-4 mt-4 border-t border-slate-800">
+              <button 
+                onClick={onSwitchToUserMode}
+                className="w-full flex items-center gap-3 px-6 py-3 font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <Globe className="w-5 h-5 text-blue-400" />
+                Mode User
               </button>
             </li>
           </ul>
@@ -1416,6 +1490,77 @@ export default function AdminDashboard({ onLogout, user }: AdminDashboardProps) 
                       <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${systemSettings.allowRegistration ? 'left-7' : 'left-1'}`}></div>
                     </button>
                   </div>
+                </div>
+                
+                <div className="p-6 border-t border-gray-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                        <Globe className="w-5 h-5 text-blue-600" />
+                        Sinkronisasi GitHub
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">Cadangkan seluruh kode aplikasi ini ke repositori GitHub Anda secara otomatis.</p>
+                    </div>
+                    <button 
+                      onClick={handleSyncToGithub}
+                      disabled={isSyncing}
+                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                    >
+                      {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+                      {isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                        GitHub Personal Access Token (PAT)
+                      </label>
+                      <input 
+                        type="password" 
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        value={systemSettings.githubPat}
+                        onChange={(e) => setSystemSettings({...systemSettings, githubPat: e.target.value})}
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Database className="w-3.5 h-3.5 text-gray-400" />
+                        Repository (username/repo)
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="username/repo-name"
+                        value={systemSettings.githubRepo}
+                        onChange={(e) => setSystemSettings({...systemSettings, githubRepo: e.target.value})}
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5 text-gray-400" />
+                        Branch
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="main"
+                        value={systemSettings.githubBranch}
+                        onChange={(e) => setSystemSettings({...systemSettings, githubBranch: e.target.value})}
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  {syncResult && (
+                    <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${
+                      syncResult.success ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'
+                    }`}>
+                      {syncResult.success ? <CheckCircle2 className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+                      <span className="text-sm font-medium">{syncResult.message}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-6 border-t border-gray-100 space-y-6">

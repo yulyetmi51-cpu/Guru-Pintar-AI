@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import Login from './components/Login';
 import UserDashboard from './components/UserDashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -11,7 +11,7 @@ import { AuthState, User } from './types';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { Loader2, Key } from 'lucide-react';
+import { Loader2, Key, AlertTriangle } from 'lucide-react';
 
 // Add type for window.aistudio
 declare global {
@@ -23,13 +23,67 @@ declare global {
   }
 }
 
-function App() {
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-slate-50 p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full text-center border border-red-100">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Oops! Terjadi Kesalahan</h1>
+            <p className="text-slate-600 mb-6">
+              Maaf, aplikasi mengalami masalah saat memuat halaman ini.
+            </p>
+            <div className="bg-slate-100 p-4 rounded-lg text-left overflow-auto max-h-40 mb-6 text-sm text-slate-700 font-mono">
+              {this.state.error?.message || "Unknown error"}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-colors"
+            >
+              Muat Ulang Aplikasi
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AppContent() {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     role: null,
     user: null,
   });
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isAdminUserMode, setIsAdminUserMode] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -145,11 +199,32 @@ function App() {
     return <Login />;
   }
 
-  if (authState.role === 'admin') {
-    return <AdminDashboard onLogout={handleLogout} user={authState.user} />;
+  if (authState.role === 'admin' && !isAdminUserMode) {
+    return (
+      <AdminDashboard 
+        onLogout={handleLogout} 
+        user={authState.user} 
+        onSwitchToUserMode={() => setIsAdminUserMode(true)} 
+      />
+    );
   }
 
-  return <UserDashboard onLogout={handleLogout} user={authState.user} />;
+  return (
+    <UserDashboard 
+      onLogout={handleLogout} 
+      user={authState.user} 
+      isAdminMode={authState.role === 'admin'}
+      onBackToAdmin={() => setIsAdminUserMode(false)}
+    />
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
 }
 
 export default App;

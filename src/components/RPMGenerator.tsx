@@ -1,13 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
+import JoditEditor from 'jodit-react';
+import { marked } from 'marked';
 import { generateRPM, generateAIImage, suggestBabs, suggestTopics, generateRPMChained } from '../services/geminiService';
-import { BookOpen, Loader2, Copy, Check, Printer, FileText, Download, Settings2, ZoomIn, ZoomOut, Maximize, ChevronDown, Layers } from 'lucide-react';
-import { doc, runTransaction, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import html2pdf from 'html2pdf.js';
+import { BookOpen, Loader2, Copy, Check, Printer, FileText, Download, Settings2, ZoomIn, ZoomOut, Maximize, ChevronDown, Layers, X, Save, History } from 'lucide-react';
+import { doc, runTransaction, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db, auth, storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { asBlob } from 'html-docx-js-typescript';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+
+const sanitizeAIOutput = (text: string) => {
+  if (!text) return text;
+  let cleanText = text;
+  
+  // 1. Replace [AI_IMAGE_PROMPT: ...] with dynamic image using Pollinations AI
+  cleanText = cleanText.replace(/\[AI_IMAGE_PROMPT:\s*(.*?)\]/gi, (match, prompt) => {
+    const encodedPrompt = encodeURIComponent(prompt.trim() + " educational illustration, safe for school, high quality, vector art");
+    return `<div style="text-align: center; margin: 20px 0;">
+      <img src="https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=400&nologo=true" alt="${prompt}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" crossorigin="anonymous" />
+      <p style="font-size: 10pt; color: #666; margin-top: 8px;"><i>Ilustrasi: ${prompt}</i></p>
+    </div>`;
+  });
+
+  // Normalize markdown headings before parsing
+  // Make sure ## becomes h3 and ### becomes h4
+  cleanText = cleanText.replace(/^###\s+(.*)/gm, '#### $1');
+  cleanText = cleanText.replace(/^##\s+(.*)/gm, '### $1');
+
+  // Parse markdown to HTML
+  let html = marked.parse(cleanText) as string;
+
+  return html;
+};
 
 const JENJANG_DATA: Record<string, { fases: string[], mapels: string[] }> = {
   'SD': {
@@ -63,6 +88,7 @@ export default function RPMGenerator() {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [isSavingToHistory, setIsSavingToHistory] = useState(false);
 
   // Load Profile from Firestore
   useEffect(() => {
@@ -141,13 +167,13 @@ export default function RPMGenerator() {
       setIsLoadingTopics(true);
       setSuggestedTopics([]);
       setIsManualTopic(false);
-      setTopic(''); // Clear current topic
+      setTopic([]); // Clear current topic
       
       try {
         const topics = await suggestTopics(jenjang, grade, currentSubject, bab);
         if (topics.length > 0) {
           setSuggestedTopics(topics);
-          setTopic(topics[0]); // Auto-select first
+          setTopic([topics[0]]); // Auto-select first
         } else {
           setIsManualTopic(true);
         }
@@ -393,7 +419,7 @@ export default function RPMGenerator() {
       setLoadingEmote('✨');
       
       setTimeout(() => {
-        setGeneratedRPM(result);
+        setGeneratedRPM(sanitizeAIOutput(result));
         setIsGenerating(false);
       }, 500);
       
@@ -401,6 +427,129 @@ export default function RPMGenerator() {
       clearInterval(progressInterval);
       setIsGenerating(false);
       setError(err.message || 'Terjadi kesalahan saat memproses permintaan.');
+    }
+  };
+
+  const handleSaveToHistory = async (type: 'doc' | 'pdf') => {
+    if (!generatedRPM || !auth.currentUser) return;
+    
+    setIsSavingToHistory(true);
+    try {
+      let blob: Blob;
+      let extension: string;
+      
+      if (type === 'doc') {
+        extension = 'doc';
+        // Prepare HTML for Word (similar to handleDownloadWord)
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = generatedRPM;
+        const clone = tempDiv;
+        
+        const tables = clone.querySelectorAll('table');
+        tables.forEach(table => {
+          const t = table as HTMLElement;
+          t.style.width = '100%';
+          t.style.borderCollapse = 'collapse';
+          t.style.marginBottom = '16pt';
+          table.setAttribute('border', '1');
+          t.style.fontFamily = 'Arial, sans-serif';
+          t.style.fontSize = '12pt';
+        });
+
+        const cells = clone.querySelectorAll('th, td');
+        cells.forEach(cell => {
+          const c = cell as HTMLElement;
+          c.style.border = '1px solid black';
+          c.style.padding = '8px';
+          c.style.verticalAlign = 'top';
+        });
+
+        const headings = clone.querySelectorAll('h3');
+        headings.forEach(h3 => {
+          const h = h3 as HTMLElement;
+          h.style.backgroundColor = '#87CEEB';
+          h.style.border = '1px solid black';
+          h.style.padding = '8px';
+          h.style.textAlign = 'center';
+          h.style.marginTop = '24pt';
+          h.style.marginBottom = '16pt';
+          h.style.fontSize = '14pt';
+          h.style.fontFamily = 'Arial, sans-serif';
+        });
+
+        const paragraphs = clone.querySelectorAll('p, li');
+        paragraphs.forEach(p => {
+          const el = p as HTMLElement;
+          el.style.textAlign = 'justify';
+          el.style.fontFamily = 'Arial, sans-serif';
+          el.style.fontSize = '12pt';
+          el.style.lineHeight = '1.5';
+        });
+
+        const html = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>RPM</title></head>
+        <body><div class="WordSection1">${clone.innerHTML}</div></body>
+        </html>`;
+        
+        blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+      } else {
+        extension = 'pdf';
+        const pdfHtml = `
+          <div class="markdown-body" style="font-family: Arial, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
+            <style>
+              h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; }
+              th, td { border: 1px solid black; padding: 8px; vertical-align: top; }
+              img { max-width: 100%; height: auto; }
+            </style>
+            ${generatedRPM}
+          </div>
+        `;
+        
+        const marginVal = pageMargin === 'narrow' ? 12.7 : pageMargin === 'wide' ? 25.4 : 20;
+        const opt = {
+          margin:       marginVal,
+          image:        { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF:        { unit: 'mm', format: paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
+          pagebreak:    { mode: ['css', 'legacy', 'avoid-all'] }
+        };
+        
+        blob = await html2pdf().set(opt).from(pdfHtml).output('blob');
+      }
+
+      // Upload to Firebase Storage
+      const fileName = `RPM_${subject}_${grade}_${Date.now()}.${extension}`;
+      const storageRef = ref(storage, `users/${auth.currentUser.uid}/history/${fileName}`);
+      await uploadBytes(storageRef, blob);
+      const fileUrl = await getDownloadURL(storageRef);
+
+      // Save to Firestore History
+      await addDoc(collection(db, 'users', auth.currentUser.uid, 'history'), {
+        subject,
+        grade,
+        topic: topic.join(', '),
+        fileUrl,
+        fileType: type,
+        createdAt: new Date().toISOString()
+      });
+
+      // Send Notification to Admin
+      await addDoc(collection(db, 'notifications'), {
+        title: 'RPM Baru Disimpan',
+        message: `${author || auth.currentUser?.email} baru saja menyimpan RPM ${subject} ${grade} ke riwayat.`,
+        type: 'info',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      alert("Berhasil disimpan ke riwayat!");
+    } catch (err) {
+      console.error("Error saving to history:", err);
+      alert("Gagal menyimpan ke riwayat. Pastikan koneksi internet stabil.");
+    } finally {
+      setIsSavingToHistory(false);
     }
   };
 
@@ -416,138 +565,171 @@ export default function RPMGenerator() {
     window.print();
   };
 
-  const handleDownloadWord = () => {
-    if (!contentRef.current) return;
+  const handleDownloadWord = async (contentToDownload?: string) => {
+    const htmlContent = contentToDownload || generatedRPM;
+    if (!htmlContent) return;
     
-    // Improved HTML for Word (.doc) with MSO styles
-    const content = contentRef.current.innerHTML;
-    const marginVal = pageMargin === 'narrow' ? '1.27cm' : pageMargin === 'wide' ? '2.54cm' : '2cm';
-    const sizeVal = paperSize === 'A4' ? '21cm 29.7cm' : paperSize === 'F4' ? '21cm 33cm' : '21.59cm 27.94cm';
+    // Create a temporary element to hold the HTML content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const clone = tempDiv;
+    
+    // Inject inline styles for Word compatibility
+    const tables = clone.querySelectorAll('table');
+    tables.forEach(table => {
+      const t = table as HTMLElement;
+      t.style.width = '100%';
+      t.style.borderCollapse = 'collapse';
+      t.style.marginBottom = '16pt';
+      table.setAttribute('border', '1');
+      t.style.fontFamily = 'Arial, sans-serif';
+      t.style.fontSize = '12pt';
+    });
+
+    const cells = clone.querySelectorAll('th, td');
+    cells.forEach(cell => {
+      const c = cell as HTMLElement;
+      c.style.border = '1px solid black';
+      c.style.padding = '8px';
+      c.style.verticalAlign = 'top';
+    });
+
+    const headings = clone.querySelectorAll('h3');
+    headings.forEach(h3 => {
+      const h = h3 as HTMLElement;
+      h.style.backgroundColor = '#87CEEB';
+      h.style.border = '1px solid black';
+      h.style.padding = '8px';
+      h.style.textAlign = 'center';
+      h.style.marginTop = '24pt';
+      h.style.marginBottom = '16pt';
+      h.style.fontSize = '14pt';
+      h.style.fontFamily = 'Arial, sans-serif';
+    });
+
+    const paragraphs = clone.querySelectorAll('p, li');
+    paragraphs.forEach(p => {
+      const el = p as HTMLElement;
+      el.style.textAlign = 'justify';
+      el.style.fontFamily = 'Arial, sans-serif';
+      el.style.fontSize = '12pt';
+      el.style.lineHeight = '1.5';
+    });
+
+    // Cari semua elemen page-break dan ganti dengan tag khusus MSO
+    const pageBreaks = clone.querySelectorAll('.page-break, [style*="page-break-before: always"]');
+    pageBreaks.forEach(el => {
+      const msoBreak = document.createElement('br');
+      msoBreak.setAttribute('clear', 'all');
+      msoBreak.setAttribute('style', 'mso-special-character:line-break;page-break-before:always');
+      if (el.parentNode) {
+        el.parentNode.replaceChild(msoBreak, el);
+      }
+    });
+
+    const content = clone.innerHTML;
 
     const html = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset='utf-8'>
       <title>Rencana Pembelajaran Mendalam</title>
-      <!--[if gte mso 9]>
-      <xml>
-        <w:WordDocument>
-          <w:View>Print</w:View>
-          <w:Zoom>100</w:Zoom>
-          <w:DoNotOptimizeForBrowser/>
-        </w:WordDocument>
-      </xml>
-      <![endif]-->
       <style>
-        @page {
-          size: ${sizeVal};
-          margin: ${marginVal};
-          mso-page-orientation: ${orientation};
+        @page WordSection1 {
+          size: ${paperSize === 'F4' ? '8.5in 13in' : '595.3pt 841.9pt'};
+          margin: ${pageMargin === 'narrow' ? '36.0pt 36.0pt 36.0pt 36.0pt' : pageMargin === 'wide' ? '72.0pt 72.0pt 72.0pt 72.0pt' : '56.7pt 56.7pt 56.7pt 56.7pt'};
+          mso-header-margin: 35.4pt;
+          mso-footer-margin: 35.4pt;
+          mso-paper-source: 0;
         }
-        body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.15; text-align: left; }
-        p, li { margin-top: 0pt; margin-bottom: 0pt; text-align: left; mso-margin-top-alt: 0pt; mso-margin-bottom-alt: 0pt; }
-        ul, ol { margin-top: 0pt; margin-bottom: 0pt; mso-margin-top-alt: 0pt; mso-margin-bottom-alt: 0pt; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; page-break-inside: avoid; }
+        div.WordSection1 { page: WordSection1; }
+        body { font-family: 'Arial', sans-serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black; }
+        p, li { margin-top: 0pt; margin-bottom: 8pt; text-align: justify; font-family: 'Arial', sans-serif; font-size: 12pt; }
+        ul, ol { margin-top: 0pt; margin-bottom: 16pt; text-align: justify; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 16pt; border: 1px solid black; page-break-inside: avoid; font-family: 'Arial', sans-serif; font-size: 12pt; }
         tr { page-break-inside: avoid; page-break-after: auto; }
         th, td { border: 1px solid black; padding: 8px; text-align: left; vertical-align: top; }
         .no-border, .no-border th, .no-border td { border: none !important; }
-        h3 { background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; font-size: 14pt; mso-shading: windowtext; mso-pattern: gray-15 auto; page-break-after: avoid; }
-        h1, h2, h4, h5, h6 { page-break-after: avoid; }
-        .page-break { page-break-before: always; mso-special-character: page-break; }
+        h3 { background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-size: 14pt; font-family: 'Arial', sans-serif; page-break-after: avoid; }
+        h4 { font-size: 12pt; margin-top: 16pt; margin-bottom: 8pt; page-break-after: avoid; font-family: 'Arial', sans-serif; font-weight: bold; }
+        h1, h2, h5, h6 { page-break-after: avoid; font-family: 'Arial', sans-serif; }
       </style>
     </head>
     <body>
-      ${content.replace(/page-break-before:\s*always/g, 'page-break-before: always; mso-special-character: page-break;').replace(/^\s*<div[^>]*class="page-break"[^>]*><\/div>\s*/i, '')}
+      <div class="WordSection1">
+        ${content}
+      </div>
     </body>
     </html>`;
 
-    const blob = new Blob(['\ufeff', html], {
-      type: 'application/msword'
-    });
-    
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.doc`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadDocx = async () => {
-    if (!contentRef.current) return;
-    
-    const content = contentRef.current.innerHTML;
-    
-    // Prepare HTML for Bento Doc (.bento)
-    const htmlString = `
-      <!DOCTYPE html>
-      <html lang="id">
-        <head>
-          <meta charset="UTF-8" />
-          <title>RPM</title>
-          <style>
-            body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.15; text-align: left; }
-            p, li { margin-top: 0; margin-bottom: 0; text-align: left; }
-            ul, ol { margin-top: 0; margin-bottom: 0; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; page-break-inside: avoid; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
-            th, td { border: 1px solid black; padding: 8px; text-align: left; vertical-align: top; }
-            h3 { background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; page-break-after: avoid; }
-            h1, h2, h4, h5, h6 { page-break-after: avoid; }
-            .page-break { page-break-before: always; }
-            .no-border, .no-border th, .no-border td { border: none !important; }
-          </style>
-        </head>
-        <body>
-          ${content.replace(/class="page-break"/g, 'style="page-break-before: always;"').replace(/^\s*<div[^>]*style="page-break-before:\s*always;"[^>]*><\/div>\s*/i, '')}
-        </body>
-      </html>
-    `;
-
     try {
-      // For Bento Doc, we can just save the structured HTML with a .bento extension
-      // or use a specific format if Bento Doc requires it. For now, we'll save it as HTML
-      // but with a .bento extension so it opens in the appropriate handler if one exists.
-      const blob = new Blob(['\ufeff', htmlString], {
-        type: 'application/vnd.bento+html' // Custom mime type
-      });
-
+      const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.bento`;
+      link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.doc`;
       
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error generating .bento:", error);
-      alert("Gagal mengunduh file Bento Doc. Silakan coba gunakan format PDF.");
+      console.error("Error generating .doc:", error);
+      alert("Gagal mengunduh file Word. Silakan coba lagi.");
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (!contentRef.current) return;
+  const handleDownloadPDF = async (contentToDownload?: string) => {
+    const htmlContent = contentToDownload || generatedRPM;
+    if (!htmlContent) return;
     
-    const element = contentRef.current;
-    const marginNum = pageMargin === 'narrow' ? 12.7 : pageMargin === 'wide' ? 25.4 : 20;
-    const format: string | [number, number] = paperSize === 'F4' ? [210, 330] : paperSize.toLowerCase();
+    // Create a styled HTML string for PDF rendering
+    const pdfHtml = `
+      <div class="markdown-body" style="font-family: Arial, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
+        <style>
+          h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; }
+          th, td { border: 1px solid black; padding: 8px; vertical-align: top; }
+          img { max-width: 100%; height: auto; }
+        </style>
+        ${htmlContent}
+      </div>
+    `;
+    
+    const marginVal = pageMargin === 'narrow' ? 12.7 : pageMargin === 'wide' ? 25.4 : 20;
     
     const opt = {
-      margin:       marginNum,
-      filename:     `RPM_${topic.join('_').replace(/\s+/g, '_')}.pdf`,
+      margin:       marginVal,
+      filename:     `RPM_${subject}_${grade}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: format, orientation: orientation as 'portrait' | 'landscape' },
-      pagebreak:    { mode: ['css', 'legacy'] as const, avoid: ['.avoid-page-break', 'table', 'tr', 'td', 'img'] }
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF:        { unit: 'mm', format: paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
+      pagebreak:    { mode: ['css', 'legacy', 'avoid-all'] }
     };
 
-    html2pdf().set(opt).from(element).save();
+    try {
+      await html2pdf().set(opt).from(pdfHtml).save();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+    }
   };
+
+  const joditConfig = React.useMemo(() => ({
+    readonly: false,
+    toolbar: true,
+    height: 'auto',
+    minHeight: 600,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '12pt',
+      textAlign: 'justify',
+      color: 'black'
+    },
+    uploader: {
+      insertImageAsBase64URI: true
+    }
+  }), []);
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans print:bg-white">
@@ -1296,7 +1478,7 @@ export default function RPMGenerator() {
                 {generatedRPM && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleDownloadPDF}
+                      onClick={() => handleDownloadPDF()}
                       className="flex items-center gap-2 px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-medium text-sm shadow-sm"
                       title="Unduh PDF"
                     >
@@ -1304,13 +1486,36 @@ export default function RPMGenerator() {
                       <span className="hidden md:inline">PDF</span>
                     </button>
                     <button
-                      onClick={handleDownloadDocx}
+                      onClick={() => handleDownloadWord()}
                       className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm"
-                      title="Unduh Bento Doc"
+                      title="Unduh Word (.doc)"
                     >
                       <FileText className="w-4 h-4" />
-                      <span className="hidden md:inline">Bento Doc</span>
+                      <span className="hidden md:inline">Word (.doc)</span>
                     </button>
+
+                    <div className="w-px h-6 bg-stone-200 mx-1 hidden sm:block" />
+
+                    <div className="flex items-center gap-1 bg-emerald-50 p-1 rounded-lg border border-emerald-100">
+                      <button
+                        onClick={() => handleSaveToHistory('pdf')}
+                        disabled={isSavingToHistory}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors font-medium text-xs shadow-sm disabled:opacity-50"
+                        title="Simpan PDF ke Riwayat"
+                      >
+                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                        <span className="hidden lg:inline">Simpan PDF</span>
+                      </button>
+                      <button
+                        onClick={() => handleSaveToHistory('doc')}
+                        disabled={isSavingToHistory}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 transition-colors font-medium text-xs disabled:opacity-50"
+                        title="Simpan Word ke Riwayat"
+                      >
+                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <History className="w-3 h-3" />}
+                        <span className="hidden lg:inline">Simpan Word</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1383,23 +1588,24 @@ export default function RPMGenerator() {
                       box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
                       padding: ${pageMargin === 'narrow' ? '12.7mm' : pageMargin === 'wide' ? '25.4mm' : '20mm'};
                       position: relative;
-                      font-family: 'Arial', Helvetica, sans-serif;
+                      font-family: 'Arial', sans-serif;
                       border-radius: 4px;
                     }
                     .preview-paper .markdown-body {
-                      font-family: 'Arial', Helvetica, sans-serif;
+                      font-family: 'Arial', sans-serif;
                       color: black;
-                      line-height: 1.15;
-                      text-align: left;
+                      line-height: 1.5;
+                      text-align: justify;
+                      font-size: 12pt;
                     }
                     .preview-paper .markdown-body p {
-                      margin-bottom: 0;
+                      margin-bottom: 8pt;
                       margin-top: 0;
-                      text-align: left;
+                      text-align: justify;
                     }
                     .preview-paper .markdown-body ol, .preview-paper .markdown-body ul {
-                      text-align: left;
-                      margin-bottom: 12px;
+                      text-align: justify;
+                      margin-bottom: 16pt;
                       margin-top: 0;
                     }
                     .preview-paper .markdown-body p:empty {
@@ -1416,13 +1622,13 @@ export default function RPMGenerator() {
                     .preview-paper .markdown-body li {
                       margin-bottom: 6px;
                       margin-top: 0;
-                      text-align: left;
+                      text-align: justify;
                     }
                     .preview-paper .markdown-body .appendix-section,
                     .preview-paper .markdown-body .appendix-section p,
                     .preview-paper .markdown-body .appendix-section li,
                     .preview-paper .markdown-body .appendix-section h4 {
-                      text-align: left !important;
+                      text-align: justify !important;
                     }
                     .preview-paper table {
                       border-collapse: collapse;
@@ -1479,6 +1685,15 @@ export default function RPMGenerator() {
                         margin: 0;
                         height: 0;
                       }
+                      .jodit-toolbar__box, .jodit-status-bar {
+                        display: none !important;
+                      }
+                      .jodit-workplace {
+                        border: none !important;
+                      }
+                      .jodit-container {
+                        border: none !important;
+                      }
                     }
                     .preview-paper img {
                       page-break-inside: avoid;
@@ -1497,23 +1712,13 @@ export default function RPMGenerator() {
                     }
                   `}</style>
                   <div className="preview-paper print:shadow-none print:p-0 print:w-full">
-                    <div ref={contentRef} className="markdown-body">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]} 
-                        rehypePlugins={[rehypeRaw]}
-                        components={{
-                          img: ({node, ...props}) => {
-                            if (!props.src) return null;
-                            return <img {...props} />;
-                          },
-                          iframe: ({node, ...props}) => {
-                            if (!props.src) return null;
-                            return <iframe {...props} />;
-                          }
-                        }}
-                      >
-                        {generatedRPM}
-                      </ReactMarkdown>
+                    <div className="markdown-body">
+                      <JoditEditor
+                        ref={null}
+                        value={generatedRPM}
+                        config={joditConfig}
+                        onBlur={newContent => setGeneratedRPM(newContent)}
+                      />
                     </div>
                   </div>
                 </div>

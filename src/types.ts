@@ -19,6 +19,18 @@ export interface HelpEntry {
   createdAt: string;
 }
 
+export interface HistoryEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  subject: string;
+  grade: string;
+  topic: string;
+  fileUrl: string;
+  fileType: 'doc' | 'pdf';
+  createdAt: string;
+}
+
 export interface AuthState {
   isAuthenticated: boolean;
   role: 'admin' | 'user' | null;

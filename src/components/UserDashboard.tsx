@@ -26,18 +26,24 @@ import {
   Zap,
   Key,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  ShieldAlert,
+  History,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import RPMGenerator from './RPMGenerator';
-import { User, HelpEntry } from '../types';
+import { User, HelpEntry, HistoryEntry } from '../types';
 import { db } from '../firebase';
-import { collection, getDocs, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
 
 import { handleFirestoreError, OperationType } from '../utils/errorHandling';
 
 interface UserDashboardProps {
   onLogout: () => void;
   user: User;
+  isAdminMode?: boolean;
+  onBackToAdmin?: () => void;
 }
 
 function HelpCenter() {
@@ -131,8 +137,106 @@ function HelpCenter() {
   );
 }
 
-export default function UserDashboard({ onLogout, user }: UserDashboardProps) {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'rpm' | 'help'>('dashboard');
+function HistoryView({ userId }: { userId: string }) {
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const q = query(
+          collection(db, 'users', userId, 'history'),
+          orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        const data: HistoryEntry[] = [];
+        querySnapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() } as HistoryEntry);
+        });
+        setHistory(data);
+      } catch (err) {
+        console.error("Error fetching history:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [userId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto w-full pb-12">
+      <div className="mb-8">
+        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Riwayat RPM Saya</h2>
+        <p className="text-slate-600">Daftar Rencana Pembelajaran yang telah Anda simpan ke riwayat.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Tanggal</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Mata Pelajaran</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Kelas</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Topik</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Tipe</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 uppercase tracking-wider">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {history.length > 0 ? history.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-slate-800">{item.subject}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{item.grade}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate" title={item.topic}>{item.topic}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      item.fileType === 'pdf' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {item.fileType}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <a 
+                      href={item.fileUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      Unduh
+                    </a>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    <History className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p>Belum ada riwayat RPM yang disimpan.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function UserDashboard({ onLogout, user, isAdminMode, onBackToAdmin }: UserDashboardProps) {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'rpm' | 'help' | 'history'>('dashboard');
   const [activationCode, setActivationCode] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [activationMsg, setActivationMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -267,6 +371,19 @@ export default function UserDashboard({ onLogout, user }: UserDashboardProps) {
               </button>
             </li>
             <li>
+              <button 
+                onClick={() => setCurrentView('history')}
+                className={`w-full flex items-center gap-3 px-6 py-3 font-medium transition-colors ${
+                  currentView === 'history'
+                    ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600 font-bold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                }`}
+              >
+                <History className="w-5 h-5" />
+                Riwayat Saya
+              </button>
+            </li>
+            <li>
               <a href="#" className="flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors font-medium">
                 <Folder className="w-5 h-5" />
                 Bahan Ajar
@@ -284,6 +401,17 @@ export default function UserDashboard({ onLogout, user }: UserDashboardProps) {
                 Profil Guru
               </a>
             </li>
+            {isAdminMode && onBackToAdmin && (
+              <li className="pt-4 mt-4 border-t border-gray-100">
+                <button 
+                  onClick={onBackToAdmin}
+                  className="w-full flex items-center gap-3 px-6 py-3 font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+                >
+                  <ShieldAlert className="w-5 h-5" />
+                  Kembali ke Admin
+                </button>
+              </li>
+            )}
           </ul>
 
           <div className="mt-8">
@@ -341,6 +469,8 @@ export default function UserDashboard({ onLogout, user }: UserDashboardProps) {
         <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fa]">
           {currentView === 'help' ? (
             <HelpCenter />
+          ) : currentView === 'history' ? (
+            <HistoryView userId={user.id} />
           ) : (
             <>
               <h1 className="text-2xl font-extrabold text-[#1e3a8a] mb-6 uppercase tracking-wide">

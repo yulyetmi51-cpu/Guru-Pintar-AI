@@ -26,7 +26,7 @@ async function executeAIPrompt(prompt: string, sysInstruction: string = ""): Pro
     }
 
     if (geminiKeys.length === 0) {
-      const envKey = process.env.GEMINI_API_KEY;
+      const envKey = globalThis.process?.env?.GEMINI_API_KEY;
       if (envKey) geminiKeys.push(envKey);
     }
 
@@ -122,7 +122,7 @@ PENTING UNTUK SOAL BERGAMBAR (AI IMAGE): Jika pengguna mengaktifkan fitur "Soal 
 [AI_IMAGE_PROMPT: Ilustrasi buku pelajaran anak Indonesia, gaya vektor 2D datar, warna cerah, rapi, ramah anak. (Deskripsi spesifik sesuai topik, misal: Siswa SD berseragam merah putih sedang berbagi makanan). TANPA TEKS, TANPA TULISAN, TANPA HURUF APA PUN DI DALAM GAMBAR.]
 
 PENTING UNTUK LAMPIRAN: Setiap kali Anda membuat lampiran "Lembar Kerja Peserta Didik (LKPD)" atau "Asesmen", Anda WAJIB menyertakan tabel "Kop" identitas siswa di bagian paling atas lampiran tersebut (tepat di bawah judul lampiran) dengan format HTML sebagai berikut:
-<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;" border="1">
+<table border="1" width="100%" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12pt; margin-bottom: 16pt;">
   <tr>
     <td style="padding: 8px; width: 150px;"><strong>Nama Siswa</strong></td>
     <td style="padding: 8px;"></td>
@@ -137,11 +137,11 @@ PENTING UNTUK LAMPIRAN: Setiap kali Anda membuat lampiran "Lembar Kerja Peserta 
   </tr>
 </table>
 
-Struktur Output yang WAJIB Diikuti (Gunakan format HTML agar tampilannya persis seperti contoh PDF dan rapi saat diekspor ke Word):
+Struktur Output yang WAJIB Diikuti (Gunakan format HTML Kuno/Klasik agar tampilannya persis seperti contoh PDF dan rapi saat diekspor ke Word. Gunakan font Arial 12pt dan rata kanan-kiri/justify):
 
-<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">RENCANA PEMBELAJARAN MENDALAM</h3>
+<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">RENCANA PEMBELAJARAN MENDALAM</h3>
 
-<table style="width: 100%; border: none; margin-bottom: 16px;">
+<table width="100%" cellpadding="4" cellspacing="0" style="border: none; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 12pt;">
   <tr>
     <td style="width: 200px; border: none; padding: 4px;"><strong>Penyusun</strong></td>
     <td style="border: none; padding: 4px;">: [Nama Penyusun]</td>
@@ -180,10 +180,10 @@ Struktur Output yang WAJIB Diikuti (Gunakan format HTML agar tampilannya persis 
   </tr>
 </table>
 
-<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">IDENTIFIKASI</h3>
+<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">IDENTIFIKASI</h3>
 
-<strong>Dimensi Profil Lulusan</strong>
-<table style="width: 100%; border: none; margin-bottom: 16px;">
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Dimensi Profil Lulusan</strong></p>
+<table width="100%" cellpadding="4" cellspacing="0" style="border: none; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 12pt;">
   <tr>
     <td style="border: none; vertical-align: top;">
       [ ] <strong>DPL1</strong><br/>Keimanan dan Ketakwaan terhadap Tuhan YME
@@ -213,77 +213,72 @@ Struktur Output yang WAJIB Diikuti (Gunakan format HTML agar tampilannya persis 
     </td>
   </tr>
 </table>
-<em>(Catatan: Berikan tanda [v] pada dimensi yang relevan dengan materi, dan [ ] untuk yang tidak)</em>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><em>(Catatan: Berikan tanda [v] pada dimensi yang relevan dengan materi, dan [ ] untuk yang tidak)</em></p>
 
-<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">DESAIN PEMBELAJARAN</h3>
+<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">DESAIN PEMBELAJARAN</h3>
 
-<strong>Capaian Pembelajaran (CP)</strong><br/>
-[Tuliskan CP yang relevan]<br/><br/>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Capaian Pembelajaran (CP)</strong><br/>
+[Tuliskan CP yang relevan]</p>
 
-<strong>Tujuan Pembelajaran (TP)</strong>
-<ol>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Tujuan Pembelajaran (TP)</strong></p>
+<ol style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li>Menjelaskan pengertian dan fungsi...</li>
   <li>Mengidentifikasi aturan...</li>
   <li>Menggunakan...</li>
 </ol>
 
-<br/>
-<strong>Pemahaman Bermakna</strong><br/>
-[Tuliskan pesan moral atau inti materi yang akan diingat siswa selamanya, relevan dengan kehidupan sehari-hari]<br/><br/>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Pemahaman Bermakna</strong><br/>
+[Tuliskan pesan moral atau inti materi yang akan diingat siswa selamanya, relevan dengan kehidupan sehari-hari]</p>
 
-<strong>Pertanyaan Pemantik</strong>
-<ul>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Pertanyaan Pemantik</strong></p>
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li>[Pertanyaan yang menggugah rasa ingin tahu siswa terkait materi]</li>
   <li>[Pertanyaan kedua]</li>
 </ul>
 
-<br/>
-<strong>Praktik Pedagogis</strong>
-<ul>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Praktik Pedagogis</strong></p>
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li><strong>Pendekatan</strong> : Pembelajaran Mendalam (Deep Learning)</li>
   <li><strong>Model</strong> : Problem Based Learning (PBL) (atau model lain yang relevan)</li>
   <li><strong>Metode</strong> : Tanya jawab, diskusi, penugasan dan ceramah</li>
 </ul>
 
-<br/>
-<strong>KEMITRAAN PEMBELAJARAN</strong>
-<ul>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>KEMITRAAN PEMBELAJARAN</strong></p>
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li><strong>Teman sekelas</strong>: Berbagi peran dalam pengamatan...</li>
   <li><strong>Guru</strong>: Sebagai fasilitator dan motivator...</li>
   <li><strong>Orang tua murid</strong>: Mendampingi murid melakukan pengamatan...</li>
 </ul>
 
-<br/>
-<strong>LINGKUNGAN PEMBELAJARAN</strong>
-<ul>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>LINGKUNGAN PEMBELAJARAN</strong></p>
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li><strong>Lingkungan Fisik</strong>: Ruang kelas yang ditata berkelompok...</li>
   <li><strong>Budaya belajar</strong>: Menekankan gotong royong, kedisiplinan dan saling menghargai</li>
 </ul>
 
-<br/>
-<strong>PEMANFAATAN DIGITAL</strong>
-<ul>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>PEMANFAATAN DIGITAL</strong></p>
+<ul style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 16pt;">
   <li>Power point</li>
   <li>Video pembelajaran</li>
   <li>Aplikasi quiziz</li>
 </ul>
 
-<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">PENGALAMAN BELAJAR</h3>
+<h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">PENGALAMAN BELAJAR</h3>
 
-<strong>Langkah-langkah Pembelajaran</strong>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Langkah-langkah Pembelajaran</strong></p>
 
-<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;" border="1">
+<table border="1" width="100%" cellpadding="8" cellspacing="0" style="border-collapse: collapse; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 12pt;">
   <thead>
     <tr>
-      <th style="padding: 12px; text-align: left; border: 1px solid #000;">Kegiatan</th>
-      <th style="padding: 12px; text-align: left; border: 1px solid #000;">Deskripsi</th>
-      <th style="padding: 12px; text-align: left; border: 1px solid #000;">Alokasi Waktu</th>
+      <th style="padding: 12px; text-align: center; border: 1px solid #000; background-color: #f2f2f2;">Kegiatan</th>
+      <th style="padding: 12px; text-align: center; border: 1px solid #000; background-color: #f2f2f2;">Deskripsi</th>
+      <th style="padding: 12px; text-align: center; border: 1px solid #000; background-color: #f2f2f2;">Alokasi Waktu</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">Awal</td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">Awal</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: justify;">
         <strong>Prinsip: Bermakna, Menggembirakan</strong><br/>
         1. Guru mengucapkan salam dan meminta ketua kelas memimpin doa sebelum pembelajaran dimulai.<br/>
         2. Guru mengecek kehadiran murid dengan penuh perhatian.<br/>
@@ -291,11 +286,11 @@ Struktur Output yang WAJIB Diikuti (Gunakan format HTML agar tampilannya persis 
         4. Guru menyampaikan materi yang akan dipelajari hari ini menghubungkan materi baru dengan pengalaman yang sudah dimiliki murid agar lebih mudah dipahami.<br/>
         5. Guru menyampaikan tujuan pembelajaran dengan bahasa yang mudah dipahami.
       </td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">15 menit</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">15 menit</td>
     </tr>
     <tr>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">Inti</td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">Inti</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: justify;">
         <strong>Prinsip: Berkesadaran, Bermakna, Menggembirakan</strong><br/><br/>
         <strong>MEMAHAMI</strong><br/>
         1. Guru menampilkan video pembelajaran tentang materi melalui proyektor.<br/>
@@ -311,24 +306,22 @@ Struktur Output yang WAJIB Diikuti (Gunakan format HTML agar tampilannya persis 
         9. Kelompok lain memberikan pendapat/komentar positif dan masukan perbaikan.<br/>
         10. Guru memberikan apresiasi berupa pujian atau stiker penghargaan untuk mendorong motivasi murid dalam belajar.
       </td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">20 menit</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">20 menit</td>
     </tr>
     <tr>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">Penutup</td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">Penutup</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: justify;">
         1. Murid diberikan soal evaluasi untuk dikerjakan secara individu.<br/>
         2. Guru bersama murid melakukan ice breaking dengan melakukan permainan ringan.<br/>
         3. Guru bersama murid melakukan refleksi pembelajaran.<br/>
         4. Kegiatan pembelajaran diakhiri dengan doa bersama.
       </td>
-      <td style="padding: 12px; vertical-align: top; border: 1px solid #000;">15 menit</td>
+      <td style="padding: 12px; vertical-align: top; border: 1px solid #000; text-align: center;">15 menit</td>
     </tr>
   </tbody>
 </table>
 
-<br/>
-
-<strong>Asesmen Pembelajaran</strong><br/>
+<p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"><strong>Asesmen Pembelajaran</strong><br/>
 A. Penilaian Sikap<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;• Teknik : Observasi<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;• Instrumen : Rubrik<br/>
@@ -339,10 +332,10 @@ B. Penilaian Keterampilan<br/>
 C. Penilaian Pengetahuan<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;• Bentuk : Soal evaluasi<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;• Teknik : Tes tertulis<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;• Instrumen : Rubrik (Terlampir)
+&nbsp;&nbsp;&nbsp;&nbsp;• Instrumen : Rubrik (Terlampir)</p>
 
 <div class="avoid-page-break" style="page-break-inside: avoid;">
-<table style="width: 100%; border: none; margin-top: 48px;">
+<table width="100%" cellpadding="4" cellspacing="0" style="border: none; margin-top: 48pt; font-family: Arial, sans-serif; font-size: 12pt;">
   <tr>
     <td style="width: 50%; text-align: center; border: none; vertical-align: top;">
       Mengetahui,<br/>
@@ -360,7 +353,7 @@ C. Penilaian Pengetahuan<br/>
 </table>
 </div>
 
-Gaya Bahasa: Gunakan bahasa yang edukatif, suportif, dan instruksi yang jelas bagi guru. Pastikan setiap langkah mencerminkan nilai-nilai karakter dan profil lulusan. Sesuaikan isi dengan Topik/Materi yang diminta pengguna.`;
+Gaya Bahasa: Gunakan bahasa yang edukatif, suportif, dan instruksi yang jelas bagi guru. Pastikan setiap langkah mencerminkan nilai-nilai karakter dan profil lulusan. Sesuaikan isi dengan Topik/Materi yang diminta pengguna. WAJIB gunakan tag <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin-bottom: 8pt;"> untuk setiap paragraf biasa.`;
 
 export async function generateRPM(
   topic: string | string[],
@@ -418,37 +411,39 @@ NIP Penyusun: ${nipGuru || '[NIP Penyusun]'}
 Tempat: ${tempat || '[Tempat]'}
 Tanggal: ${tanggal || '[Tanggal]'}
 
-PENTING: Jika ada lampiran yang diminta di bawah ini, tambahkan bagian <div style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">LAMPIRAN</h3> tepat SETELAH bagian Tanda Tangan (di paling akhir dokumen). Lalu masukkan lampiran-lampiran tersebut di bawahnya dengan sub-judul (misal: <h4>1. Materi Ajar</h4>). 
+PENTING: Jika ada lampiran yang diminta di bawah ini, tambahkan bagian <div class="page-break" style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24pt; margin-bottom: 16pt; font-family: Arial, sans-serif; font-size: 14pt;">LAMPIRAN</h3> tepat SETELAH bagian Tanda Tangan (di paling akhir dokumen). Lalu masukkan lampiran-lampiran tersebut di bawahnya dengan sub-judul (misal: <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">1. Materi Ajar</h4>). 
 
-PENTING: Seluruh isi lampiran (Materi Ajar, LKPD, Asesmen) WAJIB dibungkus dalam tag <div class="appendix-section">...</div> dan gunakan format RATA KIRI (Left Align) untuk semua teks di dalamnya. Pisahkan setiap lampiran dengan halaman baru menggunakan tag <div style="page-break-before: always;"></div>.
+PENTING: Seluruh isi lampiran (Materi Ajar, LKPD, Asesmen) WAJIB dibungkus dalam tag <div class="appendix-section">...</div> dan gunakan format RATA KIRI KANAN (Justify) dengan font Arial 12pt untuk semua teks di dalamnya. Pisahkan setiap lampiran dengan halaman baru menggunakan tag <div class="page-break" style="page-break-before: always;"></div>.
 
 PENTING: Pastikan bagian Tanda Tangan dibungkus dengan <div class="avoid-page-break" style="page-break-inside: avoid;">...</div>
 
 ${asesmenWithImages ? 'INSTRUKSI SANGAT KRITIKAL: Anda WAJIB MENYISIPKAN MINIMAL 3 GAMBAR ILUSTRASI di dalam dokumen ini (bisa di Materi, LKPD, atau Asesmen). Untuk menyisipkan gambar, Anda HARUS menuliskan kode ini persis seperti ini: [AI_IMAGE_PROMPT: deskripsi gambar yang detail dalam bahasa inggris]. JANGAN gunakan tag <img>, HANYA gunakan format kurung siku tersebut. Jika Anda tidak menyisipkan kode ini, sistem akan gagal.' : ''}
 
 BAGIAN LAMPIRAN:
-${includeMateri ? '- Tambahkan lampiran "Materi Ajar": Berisi ringkasan materi ajar yang relevan dengan topik. Awali dengan <div class="appendix-section"><h4>Materi Ajar</h4>' : '- DILARANG KERAS membuat lampiran "Materi Ajar".'}
-${includeLKPD ? '- Tambahkan lampiran "Lembar Kerja Peserta Didik (LKPD)": Berisi aktivitas atau tugas untuk siswa. Awali dengan <div style="page-break-before: always;"></div><div class="appendix-section"><h4>Lembar Kerja Peserta Didik (LKPD)</h4>. WAJIB berikan nomor pada setiap soal/tugas.' : '- DILARANG KERAS membuat lampiran "LKPD".'}
-${includeAsesmen ? `- Tambahkan lampiran "Asesmen": Awali dengan <div style="page-break-before: always;"></div><div class="appendix-section"><h4>Asesmen</h4>
+${includeMateri ? '- Tambahkan lampiran "Materi Ajar": Berisi ringkasan materi ajar yang relevan dengan topik. Awali dengan <div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Materi Ajar</h4>' : '- DILARANG KERAS membuat lampiran "Materi Ajar". JANGAN menuliskan kata "Materi Ajar" di bagian lampiran.'}
+${includeLKPD ? '- Tambahkan lampiran "Lembar Kerja Peserta Didik (LKPD)": Berisi aktivitas atau tugas untuk siswa. Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Lembar Kerja Peserta Didik (LKPD)</h4>. WAJIB berikan nomor pada setiap soal/tugas.' : '- DILARANG KERAS membuat lampiran "LKPD". JANGAN menuliskan kata "LKPD" di bagian lampiran.'}
+${includeAsesmen ? `- Tambahkan lampiran "Asesmen": Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Asesmen</h4>
   - Tipe Asesmen: ${asesmenType}
   - Jumlah Soal: ${asesmenCount}
   - Tipe Soal: ${asesmenTypesStr.join(', ')}
   - Soal Bergambar: ${asesmenWithImages ? 'Ya. Ingat instruksi kritikal di atas, Anda WAJIB menyisipkan [AI_IMAGE_PROMPT: deskripsi].' : 'Tidak'}
   - Aturan Penulisan Soal: WAJIB berikan nomor urut pada setiap soal. JANGAN gunakan spasi kosong (enter) yang berlebihan antar soal.
     * Pilihan Ganda: Gunakan tag HTML <br/> di akhir setiap baris opsi jawaban agar tersusun vertikal ke bawah. Contoh:
-      1. Teks Soal...<br/>
+      <p style="text-align: justify; font-family: Arial, sans-serif; font-size: 12pt; margin-bottom: 8pt;">1. Teks Soal...<br/>
       A. Opsi 1<br/>
       B. Opsi 2<br/>
       C. Opsi 3<br/>
-      D. Opsi 4<br/>
+      D. Opsi 4</p>
     * Isian Singkat: Tuliskan soal, lalu tekan Enter (baris baru), dan tuliskan "Kunci Jawaban:" dengan format yang jelas, tidak menyambung di sebelah soal.
     * Uraian: Tuliskan soal, lalu di baris bawahnya tuliskan "Kunci Jawaban / Rubrik Penilaian:" secara terstruktur.
     * Menjodohkan: Gunakan format daftar (list) ke bawah, bukan dipisahkan dengan koma ke samping.
   Buatkan soal-soal asesmen sesuai dengan kriteria di atas.
   
-  SETELAH SEMUA SOAL SELESAI, buatlah sub-judul <h4>Kunci Jawaban</h4> dan tuliskan kunci jawaban secara terpisah dan rapi.
-  SETELAH KUNCI JAWABAN, buatlah sub-judul <h4>Rubrik Penilaian Sikap & Keterampilan</h4> dan buatkan tabel rubrik penilaian sikap dan keterampilan yang relevan dengan topik dan aktivitas.</div>` : '- DILARANG KERAS membuat lampiran "Asesmen".'}
-${includeMateri || includeLKPD ? '</div>' : ''}
+  SETELAH SEMUA SOAL SELESAI, buatlah sub-judul <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Kunci Jawaban</h4> dan tuliskan kunci jawaban secara terpisah dan rapi.
+  SETELAH KUNCI JAWABAN, buatlah sub-judul <h4 style="font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold;">Rubrik Penilaian Sikap & Keterampilan</h4> dan buatkan tabel rubrik penilaian sikap dan keterampilan yang relevan dengan topik dan aktivitas.</div>` : '- DILARANG KERAS membuat lampiran "Asesmen". JANGAN menuliskan kata "Asesmen" di bagian lampiran.'}
+${includeMateri || includeLKPD || includeAsesmen ? '</div>' : ''}
+
+PENTING: Hanya buat lampiran yang diinstruksikan di atas. Jika ada instruksi "DILARANG KERAS", maka bagian tersebut TIDAK BOLEH ada di dalam output Anda sama sekali.
 
 Pastikan format output menggunakan HTML yang rapi sesuai dengan instruksi sistem agar tampilannya persis seperti contoh PDF. Ganti placeholder [Jenjang Sekolah], [Nama Kepala Sekolah], [NIP Kepala Sekolah], [Nama Penyusun], [NIP Penyusun], [Tempat], [Bab], dan [Tanggal] dengan data yang diberikan di atas.`;
 
@@ -567,7 +562,7 @@ INSTRUKSI KHUSUS:
 
     // Prepare Appendix section if needed
     if (includeMateri || includeLKPD || includeAsesmen) {
-      finalHtml += `\n<div style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">LAMPIRAN</h3>\n`;
+      finalHtml += `\n<div class="page-break" style="page-break-before: always;"></div><h3 style="background-color: #87CEEB; border: 1px solid #000; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px;">LAMPIRAN</h3>\n`;
     }
 
     // STEP 2: Generate Materi (Optional)
@@ -586,7 +581,7 @@ INSTRUKSI KHUSUS:
       onProgress(`Membuat Lembar Kerja Peserta Didik (LKPD) untuk ${jumlahPertemuan} pertemuan...`);
       const lkpdPrompt = `Buatkan Lampiran "Lembar Kerja Peserta Didik (LKPD)" untuk Bab: ${bab}, Topik: ${topicStr}, Mata Pelajaran: ${subject}, Kelas: ${grade}. 
       Anda WAJIB membuat LKPD yang berbeda untuk SETIAP PERTEMUAN (Pertemuan 1 hingga Pertemuan ${jumlahPertemuan}).
-      Awali dengan <div style="page-break-before: always;"></div><div class="appendix-section"><h4>Lembar Kerja Peserta Didik (LKPD)</h4> dan akhiri dengan </div>. Gunakan format HTML yang rapi.
+      Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4>Lembar Kerja Peserta Didik (LKPD)</h4> dan akhiri dengan </div>. Gunakan format HTML yang rapi.
       ${asesmenWithImages ? 'INSTRUKSI SANGAT KRITIKAL: Anda WAJIB MENYISIPKAN MINIMAL 2 GAMBAR ILUSTRASI menggunakan format [AI_IMAGE_PROMPT: deskripsi gambar dalam bahasa inggris].' : ''}`;
       
       const lkpdHtml = await executeAIPrompt(lkpdPrompt, systemInstruction);
@@ -601,7 +596,7 @@ INSTRUKSI KHUSUS:
       Jumlah Soal: ${asesmenCount}
       Tipe Soal: ${asesmenTypesStr.join(', ')}
       
-      Awali dengan <div style="page-break-before: always;"></div><div class="appendix-section"><h4>Asesmen Akhir Bab</h4> dan akhiri dengan </div>. 
+      Awali dengan <div class="page-break" style="page-break-before: always;"></div><div class="appendix-section"><h4>Asesmen Akhir Bab</h4> dan akhiri dengan </div>. 
       Sertakan juga Kunci Jawaban dan Rubrik Penilaian di bagian bawahnya.
       ${asesmenWithImages ? 'INSTRUKSI SANGAT KRITIKAL: Anda WAJIB MENYISIPKAN MINIMAL 1 GAMBAR ILUSTRASI menggunakan format [AI_IMAGE_PROMPT: deskripsi gambar dalam bahasa inggris].' : ''}`;
       
@@ -635,7 +630,7 @@ export async function generateAIImage(prompt: string): Promise<string> {
     }
 
     if (geminiKeys.length === 0) {
-      const envKey = process.env.GEMINI_API_KEY;
+      const envKey = globalThis.process?.env?.GEMINI_API_KEY;
       if (envKey) geminiKeys.push(envKey);
     }
 

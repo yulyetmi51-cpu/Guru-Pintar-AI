@@ -1,20 +1,51 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# RPM Generator - Kurikulum Merdeka
 
-# Run and deploy your AI Studio app
+A powerful, AI-driven tool designed for Indonesian educators to generate comprehensive "Rencana Pembelajaran Mendalam" (RPM) or Modul Ajar based on the Kurikulum Merdeka.
 
-This contains everything you need to run your app locally.
+## 🚀 Features
 
-View your app in AI Studio: https://ai.studio/apps/c091c315-98b9-4922-b5c9-d36f7221e4c8
+- **AI-Powered Suggestions**: Automatically suggests Chapters (Bab) and Topics based on Subject, Grade, and Level.
+- **Multi-Topic Selection**: Choose multiple topics to cover in a single lesson plan using an intuitive chip-based interface.
+- **Flexible Generation Modes**:
+  - **Daily Mode**: Generate a focused lesson plan for a single meeting.
+  - **Module Mode**: Generate a complete module for an entire chapter with multiple meetings (up to 20).
+- **Comprehensive Appendices**: Optionally generate Teaching Materials (Materi Ajar), Student Worksheets (LKPD), and Assessments (Asesmen) with Answer Keys and Rubrics.
+- **AI Image Integration**: Automatically inserts relevant educational illustrations into your documents.
+- **Professional Export Options**:
+  - **PDF**: High-quality PDF export with optimized layout for printing.
+  - **Word (.doc & .docx)**: Editable Word documents with preserved formatting.
+- **Profile Management**: Save your identity (Name, NIP, School, etc.) to your profile for quick generation.
 
-## Run Locally
+## 🛠️ Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Icons**: Lucide React
+- **AI**: Google Gemini API (gemini-3-flash-preview)
+- **Backend/Database**: Firebase Firestore & Authentication
+- **Export Libraries**: html2pdf.js, html-docx-js-typescript
 
+## 📦 Installation
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up your environment variables in `.env`:
+   ```env
+   VITE_FIREBASE_API_KEY=your_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+## 📄 License
+
+This project is licensed under the MIT License.
