@@ -7,8 +7,34 @@ import { doc, runTransaction, getDoc, updateDoc, addDoc, collection, serverTimes
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { asBlob } from 'html-docx-js-typescript';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
+
+const inlineImages = async (html: string): Promise<string> => {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  const images = Array.from(tempDiv.querySelectorAll('img'));
+  
+  await Promise.all(images.map(async (img) => {
+    try {
+      // Only process external URLs
+      if (img.src.startsWith('http')) {
+        const response = await fetch(img.src);
+        const blob = await response.blob();
+        await new Promise<void>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            img.src = reader.result as string;
+            resolve();
+          };
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch (e) {
+      console.error("Failed to inline image", e);
+    }
+  }));
+  
+  return tempDiv.innerHTML;
+};
 
 const sanitizeAIOutput = (text: string) => {
   if (!text) return text;
@@ -432,6 +458,13 @@ export default function RPMGenerator() {
     }
   };
 
+  const processDocxContent = (html: string) => {
+    let processed = html;
+    // Inject page breaks before specific sections
+    processed = processed.replace(/<h3[^>]*>(Materi Ajar|LKPD|Asesmen|Rubrik Penilaian|LEMBAR KERJA PESERTA DIDIK \(LKPD\))<\/h3>/gi, '<div class="page-break"></div><h3 style="background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt;">$1</h3>');
+    return processed;
+  };
+
   const handleSaveToHistory = async (type: 'doc' | 'pdf') => {
     if (!generatedRPM || !auth.currentUser) return;
     
@@ -442,64 +475,81 @@ export default function RPMGenerator() {
       
       if (type === 'doc') {
         extension = 'docx';
+        const processedHtml = processDocxContent(generatedRPM);
         
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = generatedRPM;
+        const docxHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Document</title>
+            <style>
+              body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.15; text-align: left; }
+              p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
+              table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; }
+              th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; line-height: 1.15; }
+              h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt; }
+              img { width: 378px; height: 378px; object-fit: contain; }
+              .page-break { page-break-before: always; }
+            </style>
+          </head>
+          <body>
+            ${processedHtml}
+          </body>
+          </html>
+        `;
         
-        const allElements = tempDiv.querySelectorAll('*');
-        allElements.forEach(el => {
-          const attrs = Array.from(el.attributes);
-          attrs.forEach(attr => {
-            if (!['colspan', 'rowspan', 'src', 'alt', 'border'].includes(attr.name)) {
-              el.removeAttribute(attr.name);
-            }
-          });
-        });
-
-        const tables = tempDiv.querySelectorAll('table');
-        tables.forEach(table => {
-          table.setAttribute('border', '1');
-        });
-
-        const cleanHtml = tempDiv.innerHTML;
-        const docxHtml = `<div>${cleanHtml}</div>`;
+        blob = await asBlob(docxHtml, { orientation: orientation as 'portrait' | 'landscape', margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }) as Blob;
+      } else {
+        extension = 'pdf';
+        const inlinedContent = await inlineImages(generatedRPM);
+        const pdfHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; color: black; font-size: 12pt; line-height: 1.15; text-align: left; }
+              p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
+              h3 { background-color: #87CEEB !important; border: 1px solid black; padding: 6px 0; text-align: center; margin: 0 0 8pt 0; line-height: 1.2; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              h4, h5, h6 { page-break-after: avoid; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; page-break-inside: auto; }
+              tr { page-break-inside: avoid; page-break-after: auto; }
+              th, td { border: 1px solid black; padding: 4px; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; text-align: left; line-height: 1.15; }
+              img { max-width: 100%; max-height: 400px; object-fit: contain; page-break-inside: avoid; display: block; margin: 0 auto; }
+              p { margin-top: 0; margin-bottom: 4pt; page-break-inside: avoid; }
+              ul { list-style-type: disc; padding-left: 2rem; margin-top: 0; margin-bottom: 8pt; }
+              ol { list-style-type: decimal; padding-left: 2rem; margin-top: 0; margin-bottom: 8pt; }
+              li { margin-top: 0; margin-bottom: 4px; page-break-inside: avoid; }
+              .page-break { page-break-before: always; height: 0; border: none; margin: 0; padding: 0; }
+            </style>
+          </head>
+          <body>
+            <div class="markdown-body">
+              ${inlinedContent}
+            </div>
+          </body>
+          </html>
+        `;
         
-        const response = await fetch('/api/generate-docx', {
+        const marginVal = pageMargin === 'narrow' ? '12.7mm' : pageMargin === 'wide' ? '25.4mm' : '20mm';
+        
+        const response = await fetch('/api/generate-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ html: docxHtml }),
+          body: JSON.stringify({
+            html: pdfHtml,
+            paperSize: paperSize.toLowerCase(),
+            orientation: orientation,
+            margin: marginVal
+          }),
         });
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to generate DOCX');
+          throw new Error(errData.details || errData.error || 'Failed to generate PDF');
         }
         
         blob = await response.blob();
-      } else {
-        extension = 'pdf';
-        const pdfHtml = `
-          <div class="markdown-body" style="font-family: Arial, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
-            <style>
-              h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; }
-              table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; }
-              th, td { border: 1px solid black; padding: 8px; vertical-align: top; }
-              img { max-width: 100%; height: auto; }
-            </style>
-            ${generatedRPM}
-          </div>
-        `;
-        
-        const marginVal = pageMargin === 'narrow' ? 12.7 : pageMargin === 'wide' ? 25.4 : 20;
-        const opt = {
-          margin:       marginVal,
-          image:        { type: 'jpeg' as const, quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
-          jsPDF:        { unit: 'mm', format: paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
-          pagebreak:    { mode: ['css', 'legacy', 'avoid-all'] }
-        };
-        
-        blob = await html2pdf().set(opt).from(pdfHtml).output('blob');
       }
 
       // Upload to Firebase Storage
@@ -554,52 +604,44 @@ export default function RPMGenerator() {
     
     setIsDownloadingWord(true);
     try {
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = htmlContent;
+      const processedHtml = processDocxContent(htmlContent);
       
-      const allElements = tempDiv.querySelectorAll('*');
-      allElements.forEach(el => {
-        const attrs = Array.from(el.attributes);
-        attrs.forEach(attr => {
-          if (!['colspan', 'rowspan', 'src', 'alt', 'border'].includes(attr.name)) {
-            el.removeAttribute(attr.name);
-          }
-        });
-      });
+      const docxHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Document</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.15; text-align: left; }
+            p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; }
+            th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; line-height: 1.15; }
+            h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt; }
+            img { width: 378px; height: 378px; object-fit: contain; }
+            .page-break { page-break-before: always; }
+          </style>
+        </head>
+        <body>
+          ${processedHtml}
+        </body>
+        </html>
+      `;
 
-      const tables = tempDiv.querySelectorAll('table');
-      tables.forEach(table => {
-        table.setAttribute('border', '1');
-      });
-
-      const cleanHtml = tempDiv.innerHTML;
-      const docxHtml = `<div>${cleanHtml}</div>`;
-
-      const response = await fetch('/api/generate-docx', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ html: docxHtml }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to generate DOCX');
-      }
-
-      const blob = await response.blob();
+      // Use html-docx-js-typescript in the browser
+      const blob = await asBlob(docxHtml, { orientation: orientation as 'portrait' | 'landscape', margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }) as Blob;
+      
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RPM_${topic.join('_').replace(/\s+/g, '_')}.docx`;
+      link.download = `RPM_${subject}_${grade}.docx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error: any) {
       console.error("Error generating .docx:", error);
-      alert("Gagal mengunduh file Word: " + (error.message || "Pastikan server backend berjalan."));
+      alert("Gagal mengunduh file Word: " + (error.message || "Terjadi kesalahan."));
     } finally {
       setIsDownloadingWord(false);
       setShowDownloadMenu(false);
@@ -610,35 +652,65 @@ export default function RPMGenerator() {
     const htmlContent = contentToDownload || generatedRPM;
     if (!htmlContent) return;
     
+    const inlinedContent = await inlineImages(htmlContent);
+    
     // Create a styled HTML string for PDF rendering
     const pdfHtml = `
-      <div class="markdown-body" style="font-family: Arial, Helvetica, sans-serif; color: black; font-size: 12pt; line-height: 1.5; text-align: justify;">
+      <!DOCTYPE html>
+      <html>
+      <head>
         <style>
-          h3 { background-color: #87CEEB; border: 1px solid black; padding: 8px; text-align: center; margin-top: 24px; margin-bottom: 16px; page-break-after: avoid; }
+          body { font-family: Arial, Helvetica, sans-serif; color: black; font-size: 12pt; line-height: 1.15; text-align: left; }
+          p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
+          h3 { background-color: #87CEEB !important; border: 1px solid black; padding: 6px 0; text-align: center; margin: 0 0 8pt 0; line-height: 1.2; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           h4, h5, h6 { page-break-after: avoid; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; table-layout: fixed; word-wrap: break-word; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid black; page-break-inside: auto; }
           tr { page-break-inside: avoid; page-break-after: auto; }
-          th, td { border: 1px solid black; padding: 8px; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; }
-          img { max-width: 100%; height: auto; page-break-inside: avoid; }
-          p, li { page-break-inside: avoid; }
+          th, td { border: 1px solid black; padding: 4px; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; text-align: left; line-height: 1.15; }
+          img { max-width: 100%; max-height: 400px; object-fit: contain; page-break-inside: avoid; display: block; margin: 0 auto; }
+          p { margin-top: 0; margin-bottom: 4pt; page-break-inside: avoid; }
+          ul { list-style-type: disc; padding-left: 2rem; margin-top: 0; margin-bottom: 8pt; }
+          ol { list-style-type: decimal; padding-left: 2rem; margin-top: 0; margin-bottom: 8pt; }
+          li { margin-top: 0; margin-bottom: 4px; page-break-inside: avoid; }
+          .page-break { page-break-before: always; height: 0; border: none; margin: 0; padding: 0; }
         </style>
-        ${htmlContent}
-      </div>
+      </head>
+      <body>
+        <div class="markdown-body">
+          ${inlinedContent}
+        </div>
+      </body>
+      </html>
     `;
     
-    const marginVal = pageMargin === 'narrow' ? 12.7 : pageMargin === 'wide' ? 25.4 : 20;
+    const marginVal = pageMargin === 'narrow' ? '12.7mm' : pageMargin === 'wide' ? '25.4mm' : '20mm';
     
-    const opt = {
-      margin:       marginVal,
-      filename:     `RPM_${subject}_${grade}.pdf`,
-      image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
-      jsPDF:        { unit: 'mm', format: paperSize.toLowerCase() === 'f4' ? [210, 330] : paperSize.toLowerCase(), orientation: orientation as 'portrait' | 'landscape' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
     try {
-      await html2pdf().set(opt).from(pdfHtml).save();
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: pdfHtml,
+          paperSize: paperSize.toLowerCase(),
+          orientation: orientation,
+          margin: marginVal
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || 'Failed to generate PDF');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `RPM_${subject}_${grade}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Gagal mengunduh PDF. Silakan coba lagi.");
@@ -1545,18 +1617,18 @@ export default function RPMGenerator() {
                     .preview-paper .markdown-body {
                       font-family: 'Arial', sans-serif;
                       color: black;
-                      line-height: 1.5;
-                      text-align: justify;
+                      line-height: 1.15;
+                      text-align: left;
                       font-size: 12pt;
                     }
                     .preview-paper .markdown-body p {
-                      margin-bottom: 8pt;
+                      margin-bottom: 4pt;
                       margin-top: 0;
-                      text-align: justify;
+                      text-align: left;
                     }
                     .preview-paper .markdown-body ol, .preview-paper .markdown-body ul {
-                      text-align: justify;
-                      margin-bottom: 16pt;
+                      text-align: left;
+                      margin-bottom: 8pt;
                       margin-top: 0;
                     }
                     .preview-paper .markdown-body p:empty {
@@ -1571,15 +1643,15 @@ export default function RPMGenerator() {
                       padding-left: 2rem;
                     }
                     .preview-paper .markdown-body li {
-                      margin-bottom: 6px;
+                      margin-bottom: 4px;
                       margin-top: 0;
-                      text-align: justify;
+                      text-align: left;
                     }
                     .preview-paper .markdown-body .appendix-section,
                     .preview-paper .markdown-body .appendix-section p,
                     .preview-paper .markdown-body .appendix-section li,
                     .preview-paper .markdown-body .appendix-section h4 {
-                      text-align: justify !important;
+                      text-align: left !important;
                     }
                     .preview-paper table {
                       border-collapse: collapse;
@@ -1587,8 +1659,6 @@ export default function RPMGenerator() {
                       margin-bottom: 1rem;
                       border: 1px solid black;
                       page-break-inside: avoid;
-                      table-layout: fixed;
-                      word-wrap: break-word;
                     }
                     .preview-paper tr {
                       page-break-inside: avoid;
@@ -1608,12 +1678,12 @@ export default function RPMGenerator() {
                     .preview-paper h3 {
                       background-color: #87CEEB;
                       border: 1px solid #000;
-                      padding: 8px;
+                      padding: 6px 0;
                       text-align: center;
-                      margin-top: 24px;
-                      margin-bottom: 16px;
+                      margin: 0 0 8pt 0;
                       font-size: 1.25rem;
                       font-weight: bold;
+                      line-height: 1.2;
                       page-break-after: avoid;
                     }
                     .preview-paper h1, .preview-paper h2, .preview-paper h4, .preview-paper h5, .preview-paper h6 {
@@ -1654,11 +1724,12 @@ export default function RPMGenerator() {
                       page-break-inside: avoid;
                     }
                     .preview-paper .page-break {
-                      height: 40px;
-                      background-color: #27272a;
+                      height: 24px;
+                      background-color: #f3f4f6; /* Tailwind gray-100 */
                       margin: 20mm -20mm;
-                      border-top: 1px solid #52525b;
-                      border-bottom: 1px solid #52525b;
+                      border-top: 1px dashed #d1d5db; /* Tailwind gray-300 */
+                      border-bottom: 1px dashed #d1d5db;
+                      box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
                       position: relative;
                       page-break-before: always;
                     }

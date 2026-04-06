@@ -6,6 +6,7 @@ import { glob } from "glob";
 import { Octokit } from "octokit";
 import dotenv from "dotenv";
 import HTMLtoDOCX from "html-to-docx";
+import puppeteer from "puppeteer";
 
 dotenv.config();
 
@@ -18,6 +19,65 @@ async function startServer() {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // API Route for PDF Generation (Level 2: Headless Chrome)
+  app.post("/api/generate-pdf", async (req, res) => {
+    try {
+      const { html, paperSize = 'A4', orientation = 'portrait', margin = '20mm' } = req.body;
+      if (!html) {
+        return res.status(400).json({ error: "HTML content is required" });
+      }
+
+      // Launch headless browser
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      const page = await browser.newPage();
+      
+      // Set content and wait for DOM
+      await page.setContent(html, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 60000 
+      });
+
+      // Explicitly wait for all images to load or fail, avoiding networkidle hangs
+      await page.evaluate(async () => {
+        const images = Array.from(document.querySelectorAll('img'));
+        const timeoutPromise = new Promise(resolve => setTimeout(resolve, 15000));
+        const imagesPromise = Promise.all(images.map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            img.addEventListener('load', resolve);
+            img.addEventListener('error', resolve);
+          });
+        }));
+        await Promise.race([imagesPromise, timeoutPromise]);
+      });
+
+      // Generate PDF
+      const pdfBuffer = await page.pdf({
+        format: paperSize as any,
+        landscape: orientation === 'landscape',
+        margin: { top: margin, right: margin, bottom: margin, left: margin },
+        printBackground: true,
+      });
+
+      await browser.close();
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="document.pdf"');
+      res.send(Buffer.from(pdfBuffer));
+    } catch (error: any) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to generate PDF",
+        details: String(error),
+        stack: error.stack
+      });
+    }
   });
 
   // API Route for DOCX Generation
