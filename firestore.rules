@@ -140,6 +140,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /sync_history/{historyId} {
+      allow read, write: if isAdmin();
+    }
+
     match /notifications/{notifId} {
       allow read, update, delete: if isAdmin();
       allow create: if isAuthenticated();
