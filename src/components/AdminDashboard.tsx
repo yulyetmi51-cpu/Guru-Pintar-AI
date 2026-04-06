@@ -36,9 +36,9 @@ import {
   Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { User, HelpEntry } from '../types';
+import { User, HelpEntry, SyncHistory } from '../types';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDoc, addDoc, query, orderBy, limit } from 'firebase/firestore';
 import { 
   BarChart, 
   Bar, 
@@ -99,6 +99,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     githubBranch: 'main'
   });
 
+  const [syncHistory, setSyncHistory] = useState<SyncHistory[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{success: boolean, message: string} | null>(null);
 
@@ -213,6 +214,20 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     }
   };
 
+  const fetchSyncHistory = async () => {
+    try {
+      const q = query(collection(db, 'sync_history'), orderBy('timestamp', 'desc'), limit(10));
+      const querySnapshot = await getDocs(q);
+      const history: SyncHistory[] = [];
+      querySnapshot.forEach((doc) => {
+        history.push({ id: doc.id, ...doc.data() } as SyncHistory);
+      });
+      setSyncHistory(history);
+    } catch (err) {
+      console.error("Error fetching sync history:", err);
+    }
+  };
+
   const markNotificationAsRead = async (id: string) => {
     try {
       await updateDoc(doc(db, 'notifications', id), { read: true });
@@ -312,12 +327,38 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
 
       if (response.ok) {
         setSyncResult({ success: true, message: "Berhasil menyinkronkan kode ke GitHub!" });
+        // Save to history
+        await addDoc(collection(db, 'sync_history'), {
+          timestamp: new Date().toISOString(),
+          status: 'success',
+          message: "Berhasil menyinkronkan kode ke GitHub!",
+          repo: systemSettings.githubRepo,
+          branch: systemSettings.githubBranch
+        });
       } else {
         setSyncResult({ success: false, message: result.error || "Gagal menyinkronkan ke GitHub." });
+        // Save to history
+        await addDoc(collection(db, 'sync_history'), {
+          timestamp: new Date().toISOString(),
+          status: 'error',
+          message: result.error || "Gagal menyinkronkan ke GitHub.",
+          repo: systemSettings.githubRepo,
+          branch: systemSettings.githubBranch
+        });
       }
+      fetchSyncHistory(); // Refresh history
     } catch (error: any) {
       console.error("Sync Error:", error);
       setSyncResult({ success: false, message: "Terjadi kesalahan jaringan atau server. Pastikan server backend berjalan." });
+      // Save to history
+      await addDoc(collection(db, 'sync_history'), {
+        timestamp: new Date().toISOString(),
+        status: 'error',
+        message: "Terjadi kesalahan jaringan atau server.",
+        repo: systemSettings.githubRepo,
+        branch: systemSettings.githubBranch
+      });
+      fetchSyncHistory(); // Refresh history
     } finally {
       setIsSyncing(false);
       console.log("Sync process finished.");
@@ -333,6 +374,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
       fetchActivationCodes();
     } else if (currentView === 'settings') {
       fetchSystemSettings();
+      fetchSyncHistory();
     }
     fetchNotifications();
   }, [currentView]);
@@ -1561,6 +1603,68 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                       <span className="text-sm font-medium">{syncResult.message}</span>
                     </div>
                   )}
+
+                  {/* Sync History Table */}
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-500" />
+                        Riwayat Sinkronisasi Terakhir
+                      </h4>
+                      <button 
+                        onClick={fetchSyncHistory}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <RefreshCcw className="w-3 h-3" />
+                        Refresh
+                      </button>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-3 font-bold text-gray-600">Waktu</th>
+                              <th className="px-4 py-3 font-bold text-gray-600">Status</th>
+                              <th className="px-4 py-3 font-bold text-gray-600">Repo/Branch</th>
+                              <th className="px-4 py-3 font-bold text-gray-600">Pesan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {syncHistory.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-8 text-center text-gray-500 italic">
+                                  Belum ada riwayat sinkronisasi.
+                                </td>
+                              </tr>
+                            ) : (
+                              syncHistory.map((history) => (
+                                <tr key={history.id} className="hover:bg-gray-50 transition-colors">
+                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                    {new Date(history.timestamp).toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                      history.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                    }`}>
+                                      {history.status === 'success' ? 'Berhasil' : 'Gagal'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-600">
+                                    <div className="font-medium truncate max-w-[150px]" title={history.repo}>{history.repo}</div>
+                                    <div className="text-[10px] text-gray-400">{history.branch}</div>
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate" title={history.message}>
+                                    {history.message}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="p-6 border-t border-gray-100 space-y-6">

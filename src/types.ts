@@ -31,6 +31,15 @@ export interface HistoryEntry {
   createdAt: string;
 }
 
+export interface SyncHistory {
+  id: string;
+  timestamp: string;
+  status: 'success' | 'error';
+  message: string;
+  repo: string;
+  branch: string;
+}
+
 export interface AuthState {
   isAuthenticated: boolean;
   role: 'admin' | 'user' | null;

@@ -667,9 +667,12 @@ export async function generateAIImage(prompt: string): Promise<string> {
           }
         }
         throw new Error("No image data found in response");
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Gemini Image Key #${i + 1} gagal:`, error);
         lastError = error;
+        if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+          console.error("Gemini API Quota Exceeded for Image Generation. Please check your billing or add more API keys.");
+        }
       }
     }
     
