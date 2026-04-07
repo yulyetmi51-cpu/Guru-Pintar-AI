@@ -15,10 +15,16 @@ async function executeAIPrompt(prompt: string, sysInstruction: string = ""): Pro
         const data = settingsDoc.data();
         if (data.aiProvider) aiProvider = data.aiProvider;
         if (data.geminiApiKeys && Array.isArray(data.geminiApiKeys)) {
-          geminiKeys = data.geminiApiKeys.filter((k: string) => k.trim() !== '');
+          geminiKeys = data.geminiApiKeys
+            .map((k: any) => typeof k === 'string' ? { key: k, active: true } : k)
+            .filter((k: any) => k.active && k.key.trim() !== '')
+            .map((k: any) => k.key);
         }
         if (data.openRouterApiKeys && Array.isArray(data.openRouterApiKeys)) {
-          openRouterKeys = data.openRouterApiKeys.filter((k: string) => k.trim() !== '');
+          openRouterKeys = data.openRouterApiKeys
+            .map((k: any) => typeof k === 'string' ? { key: k, active: true } : k)
+            .filter((k: any) => k.active && k.key.trim() !== '')
+            .map((k: any) => k.key);
         }
       }
     } catch (e) {
@@ -627,7 +633,10 @@ export async function generateAIImage(prompt: string): Promise<string> {
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
         if (data.huggingFaceApiKeys && Array.isArray(data.huggingFaceApiKeys)) {
-          hfKeys = data.huggingFaceApiKeys.filter((k: string) => k.trim() !== '');
+          hfKeys = data.huggingFaceApiKeys
+            .map((k: any) => typeof k === 'string' ? { key: k, active: true } : k)
+            .filter((k: any) => k.active && k.key.trim() !== '')
+            .map((k: any) => k.key);
         }
       }
     } catch (e) {

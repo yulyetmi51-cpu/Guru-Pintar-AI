@@ -66,6 +66,14 @@ service cloud.firestore {
              (!('usedAt' in data) || data.usedAt is string);
     }
 
+    function isValidCurriculum(data) {
+      return data.keys().hasAll(['jenjang', 'grade', 'subject', 'babs']) &&
+             data.jenjang is string &&
+             data.grade is string &&
+             data.subject is string &&
+             data.babs is list;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated(); // Allow any authenticated user to read profiles (for admin panel or display names)
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
@@ -133,6 +141,11 @@ service cloud.firestore {
                      )
                     );
       allow delete: if isAdmin();
+    }
+
+    match /curriculum/{curriculumId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidCurriculum(request.resource.data);
     }
 
     match /settings/{settingId} {

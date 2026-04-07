@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react';
-import { auth, db } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -48,21 +48,21 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
     setError('');
     try {
       const provider = new GoogleAuthProvider();
+      // Call signInWithPopup immediately on user click to avoid popup-blocked
       await signInWithPopup(auth, provider);
       // App.tsx will handle the redirect and initial document creation via onAuthStateChanged
     } catch (err: any) {
       console.error('Error with Google Login:', err);
       let errorMessage = 'Gagal login dengan Google.';
-      if (err.code === 'auth/unauthorized-domain') {
+      if (err.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup login diblokir oleh browser. Silakan izinkan popup untuk situs ini atau coba lagi.';
+      } else if (err.code === 'auth/unauthorized-domain') {
         errorMessage = 'Domain ini belum diotorisasi di Firebase. Silakan tambahkan domain ini ke Authorized Domains di Firebase Console (Authentication -> Settings).';
       }
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -123,16 +123,21 @@ export default function Login() {
 
       // Save user data to Firestore
       const role = (cleanEmail === 'admin@gurupintar.com' || cleanEmail === 'ps.erik007@gmail.com') ? 'admin' : 'user';
-      await setDoc(doc(db, 'users', user.uid), {
-        name,
-        nip: nip || '-',
-        email: cleanEmail,
-        role: role,
-        status: 'aktif',
-        createdAt: new Date().toISOString(),
-        sisa_token: role === 'admin' ? 50 : 5,
-        last_reset: new Date().toISOString()
-      });
+      const userPath = `users/${user.uid}`;
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          name,
+          nip: nip || '-',
+          email: cleanEmail,
+          role: role,
+          status: 'aktif',
+          createdAt: new Date().toISOString(),
+          sisa_token: role === 'admin' ? 50 : 5,
+          last_reset: new Date().toISOString()
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, userPath);
+      }
 
       setSuccessMessage('Akun berhasil dibuat! Anda akan segera dialihkan...');
       // App.tsx will automatically redirect since the user is now logged in

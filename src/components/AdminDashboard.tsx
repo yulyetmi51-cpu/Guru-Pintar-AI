@@ -34,7 +34,10 @@ import {
   CreditCard,
   Calendar,
   Download,
-  History
+  History,
+  ToggleRight,
+  ToggleLeft,
+  BookOpen
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { User, HelpEntry, SyncHistory } from '../types';
@@ -55,6 +58,7 @@ import {
   Cell
 } from 'recharts';
 import { handleFirestoreError, OperationType } from '../utils/errorHandling';
+import CurriculumManagement from './CurriculumManagement';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -65,7 +69,7 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: AdminDashboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [helpEntries, setHelpEntries] = useState<HelpEntry[]>([]);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'users' | 'help' | 'settings' | 'codes' | 'sync_history'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'users' | 'help' | 'settings' | 'codes' | 'sync_history' | 'curriculum'>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -85,6 +89,12 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     quantity: 1
   });
   
+  // Helper to format API keys
+  const formatApiKeys = (keys: any[]) => {
+    if (!keys || !keys.length) return [{ key: '', active: true }];
+    return keys.map(k => typeof k === 'string' ? { key: k, active: true } : k);
+  };
+
   // System Settings State
   const [systemSettings, setSystemSettings] = useState({
     appName: 'GuruPintar AI',
@@ -93,9 +103,9 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     defaultAdminToken: 100,
     allowRegistration: true,
     aiProvider: 'gemini',
-    geminiApiKeys: [''],
-    openRouterApiKeys: [''],
-    huggingFaceApiKeys: [''],
+    geminiApiKeys: [{ key: '', active: true }],
+    openRouterApiKeys: [{ key: '', active: true }],
+    huggingFaceApiKeys: [{ key: '', active: true }],
     githubPat: '',
     githubRepo: '',
     githubBranch: 'main'
@@ -190,9 +200,9 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
         setSystemSettings(prev => ({ 
           ...prev, 
           ...data,
-          geminiApiKeys: data.geminiApiKeys?.length ? data.geminiApiKeys : [''],
-          openRouterApiKeys: data.openRouterApiKeys?.length ? data.openRouterApiKeys : [''],
-          huggingFaceApiKeys: data.huggingFaceApiKeys?.length ? data.huggingFaceApiKeys : [''],
+          geminiApiKeys: formatApiKeys(data.geminiApiKeys),
+          openRouterApiKeys: formatApiKeys(data.openRouterApiKeys),
+          huggingFaceApiKeys: formatApiKeys(data.huggingFaceApiKeys),
           githubPat: data.githubPat || '',
           githubRepo: data.githubRepo || '',
           githubBranch: data.githubBranch || 'main'
@@ -253,7 +263,16 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     setSystemSettings(prev => {
       const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
       const newKeys = [...prev[keyName]];
-      newKeys[index] = value;
+      newKeys[index] = { ...newKeys[index], key: value };
+      return { ...prev, [keyName]: newKeys };
+    });
+  };
+
+  const handleKeyToggle = (provider: 'gemini' | 'openrouter' | 'huggingface', index: number) => {
+    setSystemSettings(prev => {
+      const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
+      const newKeys = [...prev[keyName]];
+      newKeys[index] = { ...newKeys[index], active: !newKeys[index].active };
       return { ...prev, [keyName]: newKeys };
     });
   };
@@ -261,7 +280,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
   const handleAddKey = (provider: 'gemini' | 'openrouter' | 'huggingface') => {
     setSystemSettings(prev => {
       const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
-      return { ...prev, [keyName]: [...prev[keyName], ''] };
+      return { ...prev, [keyName]: [...prev[keyName], { key: '', active: true }] };
     });
   };
 
@@ -269,7 +288,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     setSystemSettings(prev => {
       const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
       const newKeys = prev[keyName].filter((_, i) => i !== index);
-      if (newKeys.length === 0) newKeys.push(''); // Keep at least one
+      if (newKeys.length === 0) newKeys.push({ key: '', active: true }); // Keep at least one
       return { ...prev, [keyName]: newKeys };
     });
   };
@@ -754,6 +773,19 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
               >
                 <History className="w-5 h-5" />
                 Riwayat Sinkronisasi
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => setCurrentView('curriculum')}
+                className={`w-full flex items-center gap-3 px-6 py-3 font-medium transition-colors ${
+                  currentView === 'curriculum' 
+                    ? 'text-white bg-blue-600 border-l-4 border-orange-500' 
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-5 h-5" />
+                Kurikulum
               </button>
             </li>
             <li>
@@ -1543,6 +1575,10 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
             </div>
           )}
 
+          {currentView === 'curriculum' && (
+            <CurriculumManagement />
+          )}
+
           {currentView === 'settings' && (
             <div className="max-w-4xl space-y-8">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1713,15 +1749,23 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                       </label>
                       <p className="text-xs text-blue-700 mb-2">Sistem akan mencoba kunci dari atas ke bawah. Jika kunci pertama limit, otomatis lanjut ke kunci kedua.</p>
                       
-                      {systemSettings.geminiApiKeys.map((key, index) => (
+                      {systemSettings.geminiApiKeys.map((keyObj: any, index) => (
                         <div key={`gemini-${index}`} className="flex gap-2 items-center">
                           <input 
                             type="text" 
-                            value={key}
+                            value={keyObj.key}
                             onChange={(e) => handleKeyChange('gemini', index, e.target.value)}
                             placeholder="AIzaSy..."
-                            className="flex-1 px-4 py-2 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono text-sm"
+                            className={`flex-1 px-4 py-2 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono text-sm ${!keyObj.active ? 'opacity-50 bg-gray-50' : ''}`}
+                            disabled={!keyObj.active}
                           />
+                          <button
+                            onClick={() => handleKeyToggle('gemini', index)}
+                            className={`p-2 rounded-xl transition-all ${keyObj.active ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                            title={keyObj.active ? "Nonaktifkan Kunci" : "Aktifkan Kunci"}
+                          >
+                            {keyObj.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                          </button>
                           <button 
                             onClick={() => handleRemoveKey('gemini', index)}
                             className="p-2 text-red-500 hover:bg-red-100 rounded-xl transition-all"
@@ -1747,15 +1791,23 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                       </label>
                       <p className="text-xs text-purple-700 mb-2">Dapatkan API Key gratis di openrouter.ai. Model yang digunakan: meta-llama/llama-3-8b-instruct:free</p>
                       
-                      {systemSettings.openRouterApiKeys.map((key, index) => (
+                      {systemSettings.openRouterApiKeys.map((keyObj: any, index) => (
                         <div key={`or-${index}`} className="flex gap-2 items-center">
                           <input 
                             type="text" 
-                            value={key}
+                            value={keyObj.key}
                             onChange={(e) => handleKeyChange('openrouter', index, e.target.value)}
                             placeholder="sk-or-v1-..."
-                            className="flex-1 px-4 py-2 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-mono text-sm"
+                            className={`flex-1 px-4 py-2 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-mono text-sm ${!keyObj.active ? 'opacity-50 bg-gray-50' : ''}`}
+                            disabled={!keyObj.active}
                           />
+                          <button
+                            onClick={() => handleKeyToggle('openrouter', index)}
+                            className={`p-2 rounded-xl transition-all ${keyObj.active ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                            title={keyObj.active ? "Nonaktifkan Kunci" : "Aktifkan Kunci"}
+                          >
+                            {keyObj.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                          </button>
                           <button 
                             onClick={() => handleRemoveKey('openrouter', index)}
                             className="p-2 text-red-500 hover:bg-red-100 rounded-xl transition-all"
@@ -1781,15 +1833,23 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                       </label>
                       <p className="text-xs text-emerald-700 mb-2">Dapatkan API Key gratis di huggingface.co. Digunakan untuk generate gambar (Stable Diffusion). Jika kosong/gagal, otomatis menggunakan Pollinations.ai (Gratis).</p>
                       
-                      {systemSettings.huggingFaceApiKeys.map((key, index) => (
+                      {systemSettings.huggingFaceApiKeys.map((keyObj: any, index) => (
                         <div key={`hf-${index}`} className="flex gap-2 items-center">
                           <input 
                             type="text" 
-                            value={key}
+                            value={keyObj.key}
                             onChange={(e) => handleKeyChange('huggingface', index, e.target.value)}
                             placeholder="hf_..."
-                            className="flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+                            className={`flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm ${!keyObj.active ? 'opacity-50 bg-gray-50' : ''}`}
+                            disabled={!keyObj.active}
                           />
+                          <button
+                            onClick={() => handleKeyToggle('huggingface', index)}
+                            className={`p-2 rounded-xl transition-all ${keyObj.active ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                            title={keyObj.active ? "Nonaktifkan Kunci" : "Aktifkan Kunci"}
+                          >
+                            {keyObj.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                          </button>
                           <button 
                             onClick={() => handleRemoveKey('huggingface', index)}
                             className="p-2 text-red-500 hover:bg-red-100 rounded-xl transition-all"

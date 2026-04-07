@@ -8,7 +8,7 @@ import Login from './components/Login';
 import UserDashboard from './components/UserDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { AuthState, User } from './types';
-import { auth, db } from './firebase';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { Loader2, Key, AlertTriangle } from 'lucide-react';
@@ -91,9 +91,15 @@ function AppContent() {
         try {
           // Fetch user document from Firestore to get role and other details
           const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
+          let userDocSnap;
+          try {
+            userDocSnap = await getDoc(userDocRef);
+          } catch (err) {
+            handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+            return;
+          }
           
-          if (userDocSnap.exists()) {
+          if (userDocSnap && userDocSnap.exists()) {
             const userData = userDocSnap.data() as User;
             
             // Token Reset Logic
@@ -149,7 +155,7 @@ function AppContent() {
                   subscriptionExpiry: null
                });
             } catch (e) {
-               console.error("Could not create initial user doc", e);
+               handleFirestoreError(e, OperationType.WRITE, `users/${firebaseUser.uid}`);
             }
 
             setAuthState({

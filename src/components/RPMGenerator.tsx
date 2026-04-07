@@ -1201,7 +1201,7 @@ export default function RPMGenerator() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-stone-700 mb-1">Bab / Tema</label>
                     {isLoadingBabs ? (
@@ -1220,7 +1220,7 @@ export default function RPMGenerator() {
                             setBab(e.target.value);
                           }
                         }}
-                        className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                        className="w-full px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white text-sm shadow-sm"
                       >
                         {suggestedBabs.map((b, i) => (
                           <option key={i} value={b}>{b}</option>
@@ -1234,7 +1234,7 @@ export default function RPMGenerator() {
                           value={bab}
                           onChange={(e) => setBab(e.target.value)}
                           placeholder="Contoh: Bab 1 - Pancasila"
-                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                          className="w-full px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"
                         />
                         {suggestedBabs.length > 0 && (
                           <button 
@@ -1251,7 +1251,8 @@ export default function RPMGenerator() {
                       </div>
                     )}
                   </div>
-                  <div>
+
+                  <div className="pl-4 border-l-2 border-emerald-100 py-1 space-y-2">
                     <label className="block text-sm font-medium text-stone-700 mb-1">Topik / Materi *</label>
                     {isLoadingTopics ? (
                       <div className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 flex items-center gap-2 text-stone-500 text-sm">
@@ -1262,38 +1263,41 @@ export default function RPMGenerator() {
                       <div className="space-y-3">
                         <div className="flex flex-wrap gap-2">
                           {topic.map((t, i) => (
-                            <div key={i} className="flex items-center gap-1 bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full text-sm">
+                            <div key={i} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow-sm animate-in zoom-in duration-200">
                               <span>{t}</span>
                               <button
                                 type="button"
                                 onClick={() => setTopic(topic.filter((_, index) => index !== i))}
-                                className="hover:bg-emerald-200 rounded-full p-0.5 transition-colors"
+                                className="hover:bg-emerald-600 rounded-full p-0.5 transition-colors"
                               >
-                                <X className="w-3 h-3" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ))}
                         </div>
                         
                         {!isManualTopic && suggestedTopics.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {suggestedTopics.filter(t => !topic.includes(t)).map((t, i) => (
+                          <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-stone-400 mb-3">Saran Topik dari AI:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {suggestedTopics.filter(t => !topic.includes(t)).map((t, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setTopic([...topic, t])}
+                                  className="text-xs bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-stone-600 px-3.5 py-2 rounded-xl transition-all border border-stone-200 shadow-sm flex items-center gap-1.5"
+                                >
+                                  <span className="text-emerald-500 font-bold">+</span> {t}
+                                </button>
+                              ))}
                               <button
-                                key={i}
                                 type="button"
-                                onClick={() => setTopic([...topic, t])}
-                                className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-3 py-1.5 rounded-full transition-colors border border-stone-200"
+                                onClick={() => setIsManualTopic(true)}
+                                className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2 rounded-xl transition-all border border-emerald-100 font-bold"
                               >
-                                + {t}
+                                ➕ Ketik Manual
                               </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => setIsManualTopic(true)}
-                              className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full transition-colors border border-emerald-200 font-medium"
-                            >
-                              + Lainnya (Ketik Manual)
-                            </button>
+                            </div>
                           </div>
                         )}
 
@@ -1313,7 +1317,7 @@ export default function RPMGenerator() {
                                 }
                               }}
                               placeholder="Ketik topik lalu tekan Enter..."
-                              className="flex-1 px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm"
+                              className="flex-1 px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm shadow-sm"
                             />
                             <button
                               type="button"
@@ -1323,7 +1327,7 @@ export default function RPMGenerator() {
                                   setTopicInput('');
                                 }
                               }}
-                              className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-sm font-medium"
+                              className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100 active:scale-95"
                             >
                               Tambah
                             </button>
@@ -1331,9 +1335,9 @@ export default function RPMGenerator() {
                               <button 
                                 type="button"
                                 onClick={() => setIsManualTopic(false)}
-                                className="absolute right-24 top-1/2 -translate-y-1/2 text-xs text-emerald-600 hover:text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded-md"
+                                className="absolute right-28 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100"
                               >
-                                Kembali ke Saran AI
+                                Batal
                               </button>
                             )}
                           </div>

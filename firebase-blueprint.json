@@ -57,6 +57,33 @@
         "createdBy": { "type": "string", "description": "Email of the admin who created the code" }
       },
       "required": ["code", "durationDays", "isUsed", "createdAt", "createdBy"]
+    },
+    "Curriculum": {
+      "title": "Curriculum",
+      "description": "Curriculum structure containing subjects, babs, and topics.",
+      "type": "object",
+      "properties": {
+        "jenjang": { "type": "string" },
+        "grade": { "type": "string" },
+        "subject": { "type": "string" },
+        "babs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "topics": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["name", "topics"]
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jenjang", "grade", "subject", "babs"]
     }
   },
   "firestore": {
@@ -75,6 +102,10 @@
     "activation_codes/{codeId}": {
       "schema": { "$ref": "#/entities/ActivationCode" },
       "description": "Stores activation codes for PRO subscriptions."
+    },
+    "curriculum/{curriculumId}": {
+      "schema": { "$ref": "#/entities/Curriculum" },
+      "description": "Stores curriculum structures."
     }
   }
 }
