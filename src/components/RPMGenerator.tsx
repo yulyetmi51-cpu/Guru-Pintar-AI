@@ -459,10 +459,137 @@ export default function RPMGenerator() {
   };
 
   const processDocxContent = (html: string) => {
-    let processed = html;
-    // Inject page breaks before specific sections
-    processed = processed.replace(/<h3[^>]*>(Materi Ajar|LKPD|Asesmen|Rubrik Penilaian|LEMBAR KERJA PESERTA DIDIK \(LKPD\))<\/h3>/gi, '<div class="page-break"></div><h3 style="background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt;">$1</h3>');
-    return processed;
+    // 1. Checkbox replacements (safe to do via regex on string)
+    let processed = html.replace(/\[v\]/g, '☑').replace(/\[ \]/g, '☐');
+
+    // 2. Parse HTML using DOMParser for robust manipulation
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(processed, 'text/html');
+
+    // 3. Global Spacing (1.15)
+    const allElements = doc.querySelectorAll('p, td, th, li');
+    allElements.forEach(el => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.lineHeight = '1.15';
+      if (htmlEl.tagName.toLowerCase() === 'p' || htmlEl.tagName.toLowerCase() === 'li') {
+        htmlEl.style.marginBottom = '4pt';
+        htmlEl.style.marginTop = '0pt';
+      }
+    });
+
+    // 4. Tables Processing
+    const tables = doc.querySelectorAll('table');
+    tables.forEach(table => {
+      const textContent = table.textContent || '';
+      const isIdentity = textContent.includes('Penyusun') && textContent.includes('Instansi');
+      const isDPL = textContent.includes('DPL1') || textContent.includes('Dimensi Profil Lulusan');
+      const isSignature = textContent.includes('Mengetahui,') && textContent.includes('Kepala Sekolah');
+
+      if (isIdentity || isDPL || isSignature) {
+        // No borders for these specific tables
+        table.setAttribute('border', '0');
+        table.style.border = 'none';
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        table.style.marginBottom = '12pt';
+        
+        const cells = table.querySelectorAll('td, th');
+        cells.forEach(cell => {
+          const htmlCell = cell as HTMLElement;
+          htmlCell.style.border = 'none';
+          htmlCell.style.padding = '4px';
+          htmlCell.style.verticalAlign = 'top';
+        });
+
+        if (isSignature) {
+          // Anti page-break for signature
+          table.style.pageBreakInside = 'avoid';
+          table.style.marginTop = '24pt';
+        }
+      } else {
+        // With borders for all other tables (like Langkah Pembelajaran, Soal, dll)
+        table.setAttribute('border', '1');
+        table.style.border = '1px solid black';
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        table.style.marginBottom = '12pt';
+        
+        const cells = table.querySelectorAll('td, th');
+        cells.forEach(cell => {
+          const htmlCell = cell as HTMLElement;
+          htmlCell.style.border = '1px solid black';
+          htmlCell.style.padding = '4px';
+          htmlCell.style.verticalAlign = 'top';
+        });
+      }
+    });
+
+    // 5. Images (Strict 10x10 cm -> 378x378 px)
+    const images = doc.querySelectorAll('img');
+    images.forEach(img => {
+      img.setAttribute('width', '378');
+      img.setAttribute('height', '378');
+      img.style.width = '378px';
+      img.style.height = '378px';
+      img.style.display = 'block';
+      img.style.margin = '12pt auto';
+      img.style.objectFit = 'contain';
+    });
+
+    // 6. Headings (H3)
+    const h3s = doc.querySelectorAll('h3');
+    h3s.forEach(h3 => {
+      h3.style.backgroundColor = '#87CEEB';
+      h3.style.padding = '6px';
+      h3.style.textAlign = 'center';
+      h3.style.border = '1px solid black';
+      h3.style.marginTop = '12pt';
+      h3.style.marginBottom = '6pt';
+      h3.style.fontSize = '14pt';
+      h3.style.fontWeight = 'bold';
+    });
+
+    // 7. Page Breaks
+    // We apply page-break-before: always directly to the H3 elements.
+    // LAMPIRAN and MATERI AJAR will be together because we only break before LAMPIRAN.
+    h3s.forEach(h3 => {
+      const text = (h3.textContent || '').toUpperCase();
+      if (
+        text.includes('LAMPIRAN') ||
+        text.includes('LEMBAR KERJA PESERTA DIDIK') ||
+        text.includes('ASESMEN') ||
+        text.includes('KUNCI JAWABAN') ||
+        text.includes('RUBRIK PENILAIAN')
+      ) {
+        h3.style.pageBreakBefore = 'always';
+      }
+    });
+
+    // 8. Single Spacing for Top Section (Before DESAIN PEMBELAJARAN)
+    // Iterate through body children until we hit an H3 with "DESAIN PEMBELAJARAN"
+    let currentEl = doc.body.firstElementChild;
+    while (currentEl) {
+      if (currentEl.tagName.toLowerCase() === 'h3' && (currentEl.textContent || '').toUpperCase().includes('DESAIN PEMBELAJARAN')) {
+        break; // Stop when we reach DESAIN PEMBELAJARAN
+      }
+      
+      // Apply single spacing to this element and its children
+      const applySingleSpacing = (el: Element) => {
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.style) {
+          htmlEl.style.lineHeight = '1.0';
+          if (htmlEl.tagName.toLowerCase() === 'p' || htmlEl.tagName.toLowerCase() === 'li') {
+            htmlEl.style.marginBottom = '0pt';
+          }
+        }
+        Array.from(el.children).forEach(applySingleSpacing);
+      };
+      
+      applySingleSpacing(currentEl);
+      currentEl = currentEl.nextElementSibling;
+    }
+
+    return doc.body.innerHTML;
   };
 
   const handleSaveToHistory = async (type: 'doc' | 'pdf') => {
@@ -484,12 +611,47 @@ export default function RPMGenerator() {
             <meta charset="utf-8">
             <title>Document</title>
             <style>
-              body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.15; text-align: left; }
-              p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
-              table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; }
-              th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; line-height: 1.15; }
-              h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt; }
-              img { width: 378px; height: 378px; object-fit: contain; }
+              /* Base styling: Line spacing 1.15, Before: 0pt, After: 0pt */
+              body { 
+                font-family: Arial, sans-serif; 
+                font-size: 12pt; 
+                line-height: 1.15; 
+                text-align: left; 
+              }
+              p, h1, h2, h3, h4, h5, h6 { 
+                margin-top: 0pt; 
+                margin-bottom: 0pt; 
+              }
+              
+              /* Specific section styling: Single spacing (1.0) */
+              .single-spacing-section, .single-spacing-section p, .single-spacing-section table, .single-spacing-section td {
+                line-height: 1.0 !important;
+              }
+              .single-spacing-section p {
+                margin-bottom: 4pt; /* Slight margin for readability even in single space */
+              }
+
+              /* Lists */
+              ul, ol { margin-top: 0pt; margin-bottom: 0pt; padding-left: 24px; }
+              li { margin-bottom: 0pt; line-height: 1.15; }
+
+              /* Tables */
+              table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; border: 1px solid black; }
+              th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; }
+              
+              /* Headers */
+              h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 12pt; margin-bottom: 6pt; }
+              
+              /* Images: 10cm x 10cm (approx 378px at 96dpi) */
+              img { 
+                width: 10cm; 
+                height: 10cm; 
+                object-fit: contain; 
+                display: block;
+                margin: 12pt auto; /* Center the image */
+              }
+              
+              /* Page Breaks */
               .page-break { page-break-before: always; }
             </style>
           </head>
@@ -613,12 +775,47 @@ export default function RPMGenerator() {
           <meta charset="utf-8">
           <title>Document</title>
           <style>
-            body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.15; text-align: left; }
-            p, h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border: 1px solid black; }
-            th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; line-height: 1.15; }
-            h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 0; margin-bottom: 6pt; }
-            img { width: 378px; height: 378px; object-fit: contain; }
+            /* Base styling: Line spacing 1.15, Before: 0pt, After: 0pt */
+            body { 
+              font-family: Arial, sans-serif; 
+              font-size: 12pt; 
+              line-height: 1.15; 
+              text-align: left; 
+            }
+            p, h1, h2, h3, h4, h5, h6 { 
+              margin-top: 0pt; 
+              margin-bottom: 0pt; 
+            }
+            
+            /* Specific section styling: Single spacing (1.0) */
+            .single-spacing-section, .single-spacing-section p, .single-spacing-section table, .single-spacing-section td {
+              line-height: 1.0 !important;
+            }
+            .single-spacing-section p {
+              margin-bottom: 4pt; /* Slight margin for readability even in single space */
+            }
+
+            /* Lists */
+            ul, ol { margin-top: 0pt; margin-bottom: 0pt; padding-left: 24px; }
+            li { margin-bottom: 0pt; line-height: 1.15; }
+
+            /* Tables */
+            table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; border: 1px solid black; }
+            th, td { border: 1px solid black; padding: 4px; vertical-align: top; text-align: left; }
+            
+            /* Headers */
+            h3 { background-color: #87CEEB; padding: 6px; text-align: center; border: 1px solid black; margin-top: 12pt; margin-bottom: 6pt; }
+            
+            /* Images: 10cm x 10cm (approx 378px at 96dpi) */
+            img { 
+              width: 10cm; 
+              height: 10cm; 
+              object-fit: contain; 
+              display: block;
+              margin: 12pt auto; /* Center the image */
+            }
+            
+            /* Page Breaks */
             .page-break { page-break-before: always; }
           </style>
         </head>

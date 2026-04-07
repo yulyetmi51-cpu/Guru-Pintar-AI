@@ -33,7 +33,8 @@ import {
   Key,
   CreditCard,
   Calendar,
-  Download
+  Download,
+  History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { User, HelpEntry, SyncHistory } from '../types';
@@ -64,7 +65,7 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: AdminDashboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [helpEntries, setHelpEntries] = useState<HelpEntry[]>([]);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'users' | 'help' | 'settings' | 'codes'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'users' | 'help' | 'settings' | 'codes' | 'sync_history'>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -94,6 +95,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     aiProvider: 'gemini',
     geminiApiKeys: [''],
     openRouterApiKeys: [''],
+    huggingFaceApiKeys: [''],
     githubPat: '',
     githubRepo: '',
     githubBranch: 'main'
@@ -190,6 +192,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
           ...data,
           geminiApiKeys: data.geminiApiKeys?.length ? data.geminiApiKeys : [''],
           openRouterApiKeys: data.openRouterApiKeys?.length ? data.openRouterApiKeys : [''],
+          huggingFaceApiKeys: data.huggingFaceApiKeys?.length ? data.huggingFaceApiKeys : [''],
           githubPat: data.githubPat || '',
           githubRepo: data.githubRepo || '',
           githubBranch: data.githubBranch || 'main'
@@ -246,25 +249,25 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
     }
   };
 
-  const handleKeyChange = (provider: 'gemini' | 'openrouter', index: number, value: string) => {
+  const handleKeyChange = (provider: 'gemini' | 'openrouter' | 'huggingface', index: number, value: string) => {
     setSystemSettings(prev => {
-      const keyName = provider === 'gemini' ? 'geminiApiKeys' : 'openRouterApiKeys';
+      const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
       const newKeys = [...prev[keyName]];
       newKeys[index] = value;
       return { ...prev, [keyName]: newKeys };
     });
   };
 
-  const handleAddKey = (provider: 'gemini' | 'openrouter') => {
+  const handleAddKey = (provider: 'gemini' | 'openrouter' | 'huggingface') => {
     setSystemSettings(prev => {
-      const keyName = provider === 'gemini' ? 'geminiApiKeys' : 'openRouterApiKeys';
+      const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
       return { ...prev, [keyName]: [...prev[keyName], ''] };
     });
   };
 
-  const handleRemoveKey = (provider: 'gemini' | 'openrouter', index: number) => {
+  const handleRemoveKey = (provider: 'gemini' | 'openrouter' | 'huggingface', index: number) => {
     setSystemSettings(prev => {
-      const keyName = provider === 'gemini' ? 'geminiApiKeys' : 'openRouterApiKeys';
+      const keyName = provider === 'gemini' ? 'geminiApiKeys' : provider === 'openrouter' ? 'openRouterApiKeys' : 'huggingFaceApiKeys';
       const newKeys = prev[keyName].filter((_, i) => i !== index);
       if (newKeys.length === 0) newKeys.push(''); // Keep at least one
       return { ...prev, [keyName]: newKeys };
@@ -374,6 +377,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
       fetchActivationCodes();
     } else if (currentView === 'settings') {
       fetchSystemSettings();
+    } else if (currentView === 'sync_history') {
       fetchSyncHistory();
     }
     fetchNotifications();
@@ -548,7 +552,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
       if (editingUser) {
         // Update existing user in Firestore
         const userRef = doc(db, 'users', editingUser.id);
-        await updateDoc(userRef, {
+        const updateData: any = {
           name: formData.name,
           nip: formData.nip || '-',
           email: formData.email,
@@ -557,7 +561,11 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
           sisa_token: Number(formData.sisa_token) || 0,
           subscription: formData.subscription || 'free',
           subscriptionExpiry: formData.subscriptionExpiry || null
-        });
+        };
+        if (formData.password) {
+          updateData.password = formData.password;
+        }
+        await updateDoc(userRef, updateData);
       } else {
         // Create new user document in Firestore
         // Note: This does not create a Firebase Auth account. 
@@ -567,6 +575,7 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
           name: formData.name,
           nip: formData.nip || '-',
           email: formData.email,
+          password: formData.password || '',
           role: formData.role,
           status: formData.status,
           sisa_token: Number(formData.sisa_token) || 5,
@@ -736,6 +745,19 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
             </li>
             <li>
               <button 
+                onClick={() => setCurrentView('sync_history')}
+                className={`w-full flex items-center gap-3 px-6 py-3 font-medium transition-colors ${
+                  currentView === 'sync_history' 
+                    ? 'text-white bg-blue-600 border-l-4 border-orange-500' 
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <History className="w-5 h-5" />
+                Riwayat Sinkronisasi
+              </button>
+            </li>
+            <li>
+              <button 
                 onClick={() => setCurrentView('settings')}
                 className={`w-full flex items-center gap-3 px-6 py-3 font-medium transition-colors ${
                   currentView === 'settings' 
@@ -776,7 +798,9 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
           <h1 className="text-xl font-bold text-slate-800">
             {currentView === 'dashboard' ? 'Ringkasan Sistem' : 
              currentView === 'users' ? 'Manajemen Pengguna' : 
-             currentView === 'help' ? 'Pusat Bantuan' : 'Pengaturan Sistem'}
+             currentView === 'help' ? 'Pusat Bantuan' : 
+             currentView === 'codes' ? 'Kode Aktivasi' :
+             currentView === 'sync_history' ? 'Riwayat Sinkronisasi' : 'Pengaturan Sistem'}
           </h1>
           <div className="flex items-center gap-4">
             {(currentView === 'users' || currentView === 'help') && (
@@ -1462,6 +1486,63 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
             </div>
           )}
 
+          {currentView === 'sync_history' && (
+            <div className="space-y-8">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-bold text-gray-900">Riwayat Sinkronisasi GitHub</h3>
+                  <button 
+                    onClick={fetchSyncHistory}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    <RefreshCcw className="w-4 h-4" />
+                    Refresh
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-4">Waktu</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Repository</th>
+                        <th className="px-6 py-4">Branch</th>
+                        <th className="px-6 py-4">Pesan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {syncHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-12 text-center text-gray-500">
+                            Belum ada riwayat sinkronisasi.
+                          </td>
+                        </tr>
+                      ) : (
+                        syncHistory.map((h) => (
+                          <tr key={h.id} className="group hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                              {new Date(h.timestamp).toLocaleString('id-ID')}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                h.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {h.status === 'success' ? 'Berhasil' : 'Gagal'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{h.repo}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{h.branch}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={h.message}>{h.message}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {currentView === 'settings' && (
             <div className="max-w-4xl space-y-8">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1603,68 +1684,6 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                       <span className="text-sm font-medium">{syncResult.message}</span>
                     </div>
                   )}
-
-                  {/* Sync History Table */}
-                  <div className="mt-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-blue-500" />
-                        Riwayat Sinkronisasi Terakhir
-                      </h4>
-                      <button 
-                        onClick={fetchSyncHistory}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <RefreshCcw className="w-3 h-3" />
-                        Refresh
-                      </button>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-4 py-3 font-bold text-gray-600">Waktu</th>
-                              <th className="px-4 py-3 font-bold text-gray-600">Status</th>
-                              <th className="px-4 py-3 font-bold text-gray-600">Repo/Branch</th>
-                              <th className="px-4 py-3 font-bold text-gray-600">Pesan</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {syncHistory.length === 0 ? (
-                              <tr>
-                                <td colSpan={4} className="px-4 py-8 text-center text-gray-500 italic">
-                                  Belum ada riwayat sinkronisasi.
-                                </td>
-                              </tr>
-                            ) : (
-                              syncHistory.map((history) => (
-                                <tr key={history.id} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                                    {new Date(history.timestamp).toLocaleString('id-ID')}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                      history.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                    }`}>
-                                      {history.status === 'success' ? 'Berhasil' : 'Gagal'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-600">
-                                    <div className="font-medium truncate max-w-[150px]" title={history.repo}>{history.repo}</div>
-                                    <div className="text-[10px] text-gray-400">{history.branch}</div>
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate" title={history.message}>
-                                    {history.message}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 
                 <div className="p-6 border-t border-gray-100 space-y-6">
@@ -1751,6 +1770,40 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                         className="text-sm font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 mt-2"
                       >
                         <Plus className="w-4 h-4" /> Tambah API Key OpenRouter
+                      </button>
+                    </div>
+
+                    {/* Hugging Face Keys */}
+                    <div className="space-y-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                      <label className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+                        <Key className="w-4 h-4 text-emerald-600" />
+                        Daftar API Key Hugging Face (Untuk Gambar)
+                      </label>
+                      <p className="text-xs text-emerald-700 mb-2">Dapatkan API Key gratis di huggingface.co. Digunakan untuk generate gambar (Stable Diffusion). Jika kosong/gagal, otomatis menggunakan Pollinations.ai (Gratis).</p>
+                      
+                      {systemSettings.huggingFaceApiKeys.map((key, index) => (
+                        <div key={`hf-${index}`} className="flex gap-2 items-center">
+                          <input 
+                            type="text" 
+                            value={key}
+                            onChange={(e) => handleKeyChange('huggingface', index, e.target.value)}
+                            placeholder="hf_..."
+                            className="flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+                          />
+                          <button 
+                            onClick={() => handleRemoveKey('huggingface', index)}
+                            className="p-2 text-red-500 hover:bg-red-100 rounded-xl transition-all"
+                            title="Hapus Kunci"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={() => handleAddKey('huggingface')}
+                        className="text-sm font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 mt-2"
+                      >
+                        <Plus className="w-4 h-4" /> Tambah API Key Hugging Face
                       </button>
                     </div>
                   </div>
@@ -1843,6 +1896,17 @@ export default function AdminDashboard({ onLogout, user, onSwitchToUserMode }: A
                   value={formData.email}
                   onChange={e => setFormData({...formData, email: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input 
+                  type="text" 
+                  value={formData.password || ''}
+                  onChange={e => setFormData({...formData, password: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder={editingUser ? "Kosongkan jika tidak ingin mengubah" : "Masukkan password"}
+                  required={!editingUser}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">

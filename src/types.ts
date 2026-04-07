@@ -3,6 +3,7 @@ export interface User {
   name: string;
   nip: string;
   email: string;
+  password?: string;
   role: 'admin' | 'user';
   status: 'aktif' | 'nonaktif';
   sisa_token?: number;

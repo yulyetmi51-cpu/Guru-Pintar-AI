@@ -621,62 +621,76 @@ INSTRUKSI KHUSUS:
 export async function generateAIImage(prompt: string): Promise<string> {
   try {
     // Fetch AI Provider Settings
-    let geminiKeys: string[] = [];
+    let hfKeys: string[] = [];
     try {
       const settingsDoc = await getDoc(doc(db, 'settings', 'general'));
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
-        if (data.geminiApiKeys && Array.isArray(data.geminiApiKeys)) {
-          geminiKeys = data.geminiApiKeys.filter((k: string) => k.trim() !== '');
+        if (data.huggingFaceApiKeys && Array.isArray(data.huggingFaceApiKeys)) {
+          hfKeys = data.huggingFaceApiKeys.filter((k: string) => k.trim() !== '');
         }
       }
     } catch (e) {
       console.error("Error fetching AI settings:", e);
     }
 
-    if (geminiKeys.length === 0) {
-      const envKey = globalThis.process?.env?.GEMINI_API_KEY;
-      if (envKey) geminiKeys.push(envKey);
+    if (hfKeys.length === 0 && globalThis.process?.env?.HUGGINGFACE_API_KEY) {
+      hfKeys.push(globalThis.process.env.HUGGINGFACE_API_KEY);
     }
 
-    if (geminiKeys.length === 0) throw new Error("Tidak ada API Key Gemini yang tersedia.");
+    const callHuggingFace = async (key: string) => {
+      const response = await fetch(
+        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-3.5-large",
+        {
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          body: JSON.stringify({ inputs: prompt }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Hugging Face API error: ${response.status}`);
+      }
+      const blob = await response.blob();
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    };
 
-    let lastError;
-    for (let i = 0; i < geminiKeys.length; i++) {
+    const callPollinations = async () => {
+      // Pollinations returns an image directly. We fetch it to ensure it's valid and convert to base64
+      // so it works seamlessly with the existing app logic that expects a base64 string.
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Pollinations API failed");
+      const blob = await response.blob();
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    };
+
+    // Try Hugging Face first
+    for (let i = 0; i < hfKeys.length; i++) {
       try {
-        const ai = new GoogleGenAI({ apiKey: geminiKeys[i] });
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image",
-          contents: {
-            parts: [
-              {
-                text: `Buatkan gambar edukatif untuk materi sekolah dengan deskripsi: ${prompt}. Gaya gambar bebas, lakukan yang terbaik agar menarik bagi siswa. JANGAN sertakan teks di dalam gambar.`,
-              },
-            ],
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: "1:1",
-            },
-          },
-        });
-
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          }
-        }
-        throw new Error("No image data found in response");
-      } catch (error: any) {
-        console.warn(`Gemini Image Key #${i + 1} gagal:`, error);
-        lastError = error;
-        if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
-          console.error("Gemini API Quota Exceeded for Image Generation. Please check your billing or add more API keys.");
-        }
+        console.log(`Mencoba Hugging Face Key #${i + 1}...`);
+        return await callHuggingFace(hfKeys[i]);
+      } catch (error) {
+        console.warn(`Hugging Face Key #${i + 1} gagal:`, error);
       }
     }
-    
-    throw new Error(`Semua kunci Gemini untuk gambar gagal. Error terakhir: ${lastError}`);
+
+    // Fallback to Pollinations
+    console.log("Mencoba fallback ke Pollinations.ai...");
+    return await callPollinations();
+
   } catch (error) {
     console.error("Error generating AI image:", error);
     return ""; // Return empty string on failure
