@@ -1719,27 +1719,6 @@ export default function RPMGenerator() {
                     </div>
 
                     <div className="w-px h-6 bg-stone-200 mx-1 hidden sm:block" />
-
-                    <div className="flex items-center gap-1 bg-emerald-50 p-1 rounded-lg border border-emerald-100">
-                      <button
-                        onClick={() => handleSaveToHistory('pdf')}
-                        disabled={isSavingToHistory}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors font-medium text-xs shadow-sm disabled:opacity-50"
-                        title="Simpan PDF ke Riwayat"
-                      >
-                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                        <span className="hidden lg:inline">Simpan PDF</span>
-                      </button>
-                      <button
-                        onClick={() => handleSaveToHistory('doc')}
-                        disabled={isSavingToHistory}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 transition-colors font-medium text-xs disabled:opacity-50"
-                        title="Simpan Word ke Riwayat"
-                      >
-                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <History className="w-3 h-3" />}
-                        <span className="hidden lg:inline">Simpan Word</span>
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
