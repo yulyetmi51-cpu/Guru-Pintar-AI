@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import JoditEditor from 'jodit-react';
 import { marked } from 'marked';
+import { motion, AnimatePresence } from 'framer-motion';
 import { generateRPM, generateAIImage, suggestBabs, suggestTopics, generateRPMChained } from '../services/geminiService';
-import { BookOpen, Loader2, Copy, Check, Printer, FileText, Download, Settings2, ZoomIn, ZoomOut, Maximize, ChevronDown, Layers, X, Save, History } from 'lucide-react';
+import { BookOpen, Loader2, Copy, Check, Printer, FileText, Download, Settings2, ZoomIn, ZoomOut, Maximize, ChevronDown, Layers, X, Save, History, Sparkles, ListChecks, CheckCircle2, Bot, ArrowRight } from 'lucide-react';
 import { doc, runTransaction, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -148,7 +149,10 @@ export default function RPMGenerator() {
   useEffect(() => {
     const data = JENJANG_DATA[jenjang];
     if (data) {
-      setSubject(data.mapels[0]);
+      // Don't auto-select subject to allow step-by-step flow
+      setSubject('');
+      setBab('');
+      setTopic([]);
     }
   }, [jenjang]);
 
@@ -167,7 +171,7 @@ export default function RPMGenerator() {
         const babs = await suggestBabs(jenjang, grade, currentSubject);
         if (babs.length > 0) {
           setSuggestedBabs(babs);
-          setBab(babs[0]); // Auto-select first
+          // Don't auto-select to make it truly step-by-step
         } else {
           setIsManualBab(true);
         }
@@ -1153,240 +1157,389 @@ export default function RPMGenerator() {
             </div>
 
             {/* Konten Section */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-stone-800">
-                <FileText className="w-5 h-5 text-emerald-600" />
-                Konten
-              </h2>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Mata Pelajaran *</label>
-                    <select
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white"
-                      required
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-lg font-semibold flex items-center gap-2 text-stone-800">
+                  <FileText className="w-5 h-5 text-emerald-600" />
+                  Konten Pembelajaran
+                </h2>
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">AI Assisted</span>
+                </div>
+              </div>
+              
+              <div className="relative space-y-12">
+                {/* Vertical Stepper Line */}
+                <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-stone-100 -z-0" />
+
+                {/* STEP 1: MATA PELAJARAN */}
+                <div className="relative pl-12">
+                  <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-10 transition-all duration-500 ${subject ? 'bg-emerald-600 text-white scale-110' : 'bg-white border-2 border-emerald-500 text-emerald-600'}`}>
+                    {subject ? <CheckCircle2 className="w-5 h-5" /> : '1'}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-stone-400" />
+                        <label className="text-sm font-bold text-stone-700">Mata Pelajaran *</label>
+                      </div>
+                      <select
+                        value={subject}
+                        onChange={(e) => {
+                          setSubject(e.target.value);
+                          setBab(''); // Reset bab when subject changes
+                          setTopic([]); // Reset topic when subject changes
+                          setSuggestedBabs([]); // Clear suggestions
+                          setSuggestedTopics([]); // Clear suggestions
+                        }}
+                        className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white shadow-sm font-medium"
+                        required
+                      >
+                        <option value="" disabled>-- Pilih Mata Pelajaran --</option>
+                        {JENJANG_DATA[jenjang]?.mapels.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                        <option value="Lainnya">Lainnya...</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <History className="w-4 h-4 text-stone-400" />
+                        <label className="text-sm font-bold text-stone-700">Alokasi Waktu</label>
+                      </div>
+                      <input
+                        type="text"
+                        value={timeAllocation}
+                        onChange={(e) => setTimeAllocation(e.target.value)}
+                        placeholder="Contoh: 2 x 35 Menit"
+                        className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {subject === 'Lainnya' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4 p-4 bg-stone-50 rounded-xl border border-stone-200"
                     >
-                      {JENJANG_DATA[jenjang]?.mapels.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                      <option value="Lainnya">Lainnya...</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Alokasi Waktu</label>
-                    <input
-                      type="text"
-                      value={timeAllocation}
-                      onChange={(e) => setTimeAllocation(e.target.value)}
-                      placeholder="Contoh: 2 x 35 Menit"
-                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                    />
-                  </div>
+                      <label className="block text-xs font-bold text-stone-500 mb-2 uppercase tracking-wider">Tulis Mata Pelajaran Kustom</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={customSubject}
+                        onChange={(e) => setCustomSubject(e.target.value)}
+                        placeholder="Masukkan nama mata pelajaran"
+                        className="w-full px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm bg-white"
+                        required
+                      />
+                    </motion.div>
+                  )}
                 </div>
 
-                {subject === 'Lainnya' && (
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Tulis Mata Pelajaran *</label>
-                    <input
-                      type="text"
-                      autoFocus
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      placeholder="Masukkan nama mata pelajaran"
-                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                      required
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Bab / Tema</label>
-                    {isLoadingBabs ? (
-                      <div className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 flex items-center gap-2 text-stone-500 text-sm">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>AI sedang menyusun daftar bab...</span>
+                {/* STEP 2: BAB / TEMA */}
+                <AnimatePresence mode="wait">
+                  {(subject || (subject === 'Lainnya' && customSubject)) && (
+                    <motion.div 
+                      key="step-2"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="relative pl-12"
+                    >
+                      <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-10 transition-all duration-500 ${bab ? 'bg-emerald-600 text-white scale-110' : 'bg-white border-2 border-emerald-500 text-emerald-600'}`}>
+                        {bab ? <CheckCircle2 className="w-5 h-5" /> : '2'}
                       </div>
-                    ) : (suggestedBabs.length > 0 && !isManualBab) ? (
-                      <select
-                        value={bab}
-                        onChange={(e) => {
-                          if (e.target.value === 'MANUAL_INPUT') {
-                            setIsManualBab(true);
-                            setBab('');
-                          } else {
-                            setBab(e.target.value);
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white text-sm shadow-sm"
-                      >
-                        {suggestedBabs.map((b, i) => (
-                          <option key={i} value={b}>{b}</option>
-                        ))}
-                        <option value="MANUAL_INPUT" className="font-semibold text-emerald-600">➕ Lainnya (Ketik Manual)</option>
-                      </select>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={bab}
-                          onChange={(e) => setBab(e.target.value)}
-                          placeholder="Contoh: Bab 1 - Pancasila"
-                          className="w-full px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm"
-                        />
-                        {suggestedBabs.length > 0 && (
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setIsManualBab(false);
-                              setBab(suggestedBabs[0]);
-                            }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-emerald-600 hover:text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded-md"
-                          >
-                            Kembali ke Saran AI
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pl-4 border-l-2 border-emerald-100 py-1 space-y-2">
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Topik / Materi *</label>
-                    {isLoadingTopics ? (
-                      <div className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 flex items-center gap-2 text-stone-500 text-sm">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>AI sedang menyusun daftar topik...</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          {topic.map((t, i) => (
-                            <div key={i} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow-sm animate-in zoom-in duration-200">
-                              <span>{t}</span>
-                              <button
-                                type="button"
-                                onClick={() => setTopic(topic.filter((_, index) => index !== i))}
-                                className="hover:bg-emerald-600 rounded-full p-0.5 transition-colors"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-stone-400" />
+                            <label className="text-sm font-bold text-stone-700">Bab / Tema Pembelajaran</label>
+                          </div>
+                          {isLoadingBabs && (
+                            <div className="flex items-center gap-2 text-emerald-600">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span className="text-[10px] font-bold uppercase animate-pulse">AI Thinking...</span>
                             </div>
-                          ))}
+                          )}
                         </div>
                         
-                        {!isManualTopic && suggestedTopics.length > 0 && (
-                          <div className="bg-stone-50/50 p-4 rounded-2xl border border-stone-100">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-stone-400 mb-3">Saran Topik dari AI:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {suggestedTopics.filter(t => !topic.includes(t)).map((t, i) => (
+                        {isLoadingBabs ? (
+                          <div className="grid grid-cols-1 gap-3">
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="h-12 bg-stone-50 rounded-xl border border-stone-100 animate-pulse flex items-center px-4 gap-3">
+                                <div className="w-4 h-4 bg-stone-200 rounded-full" />
+                                <div className="h-3 bg-stone-200 rounded w-2/3" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (suggestedBabs.length > 0 && !isManualBab) ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {suggestedBabs.map((b, i) => (
                                 <button
                                   key={i}
                                   type="button"
-                                  onClick={() => setTopic([...topic, t])}
-                                  className="text-xs bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-stone-600 px-3.5 py-2 rounded-xl transition-all border border-stone-200 shadow-sm flex items-center gap-1.5"
+                                  onClick={() => {
+                                    setBab(b);
+                                    setTopic([]); // Reset topic when bab changes
+                                  }}
+                                  className={`text-left px-4 py-3 rounded-xl border transition-all flex items-center justify-between group ${bab === b ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white border-stone-200 text-stone-700 hover:border-emerald-300 hover:bg-emerald-50'}`}
                                 >
-                                  <span className="text-emerald-500 font-bold">+</span> {t}
+                                  <span className="text-sm font-medium line-clamp-1">{b}</span>
+                                  {bab === b ? <Check className="w-4 h-4 shrink-0" /> : <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
                                 </button>
                               ))}
                               <button
                                 type="button"
-                                onClick={() => setIsManualTopic(true)}
-                                className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2 rounded-xl transition-all border border-emerald-100 font-bold"
+                                onClick={() => {
+                                  setIsManualBab(true);
+                                  setBab('');
+                                }}
+                                className="text-left px-4 py-3 rounded-xl border border-dashed border-stone-300 text-stone-500 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 text-sm font-bold bg-stone-50/50"
                               >
-                                ➕ Ketik Manual
+                                <X className="w-4 h-4 rotate-45" />
+                                Ketik Manual...
                               </button>
                             </div>
                           </div>
-                        )}
-
-                        {(isManualTopic || suggestedTopics.length === 0) && (
-                          <div className="relative flex gap-2">
+                        ) : (
+                          <div className="relative group">
                             <input
                               type="text"
-                              value={topicInput}
-                              onChange={(e) => setTopicInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && topicInput.trim()) {
-                                  e.preventDefault();
-                                  if (!topic.includes(topicInput.trim())) {
-                                    setTopic([...topic, topicInput.trim()]);
-                                  }
-                                  setTopicInput('');
-                                }
-                              }}
-                              placeholder="Ketik topik lalu tekan Enter..."
-                              className="flex-1 px-4 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm shadow-sm"
+                              value={bab}
+                              onChange={(e) => setBab(e.target.value)}
+                              placeholder="Contoh: Bab 1 - Mengenal Lingkungan"
+                              className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm bg-white"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (topicInput.trim() && !topic.includes(topicInput.trim())) {
-                                  setTopic([...topic, topicInput.trim()]);
-                                  setTopicInput('');
-                                }
-                              }}
-                              className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100 active:scale-95"
-                            >
-                              Tambah
-                            </button>
-                            {suggestedTopics.length > 0 && (
+                            {suggestedBabs.length > 0 && (
                               <button 
                                 type="button"
-                                onClick={() => setIsManualTopic(false)}
-                                className="absolute right-28 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100"
+                                onClick={() => setIsManualBab(false)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-colors"
                               >
-                                Batal
+                                Lihat Saran AI
                               </button>
                             )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* STEP 3: TOPIK / MATERI */}
+                <AnimatePresence mode="wait">
+                  {bab && (
+                    <motion.div 
+                      key="step-3"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="relative pl-12"
+                    >
+                      <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-10 transition-all duration-500 ${topic.length > 0 ? 'bg-emerald-600 text-white scale-110' : 'bg-white border-2 border-emerald-500 text-emerald-600'}`}>
+                        {topic.length > 0 ? <CheckCircle2 className="w-5 h-5" /> : '3'}
+                      </div>
+                      
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ListChecks className="w-4 h-4 text-stone-400" />
+                            <label className="text-sm font-bold text-stone-700">Topik / Materi Spesifik *</label>
+                          </div>
+                          {isLoadingTopics && (
+                            <div className="flex items-center gap-2 text-emerald-600">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span className="text-[10px] font-bold uppercase animate-pulse">AI Researching...</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {isLoadingTopics ? (
+                          <div className="bg-emerald-50/30 p-6 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center gap-4 text-center">
+                            <div className="relative">
+                              <Bot className="w-10 h-10 text-emerald-600 animate-bounce" />
+                              <Sparkles className="w-4 h-4 text-emerald-400 absolute -top-1 -right-1 animate-pulse" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-emerald-800">AI sedang menganalisis kurikulum...</p>
+                              <p className="text-xs text-emerald-600 mt-1">Menyusun daftar topik yang paling relevan untuk Anda.</p>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            {/* Selected Topics Chips */}
+                            <div className="flex flex-wrap gap-2.5">
+                              {topic.map((t, i) => (
+                                <motion.div 
+                                  key={i} 
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  className="flex items-center gap-2 bg-emerald-600 text-white pl-4 pr-2 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100 group"
+                                >
+                                  <span>{t}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTopic(topic.filter((_, index) => index !== i))}
+                                    className="bg-emerald-700/50 hover:bg-emerald-800 rounded-lg p-1 transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </motion.div>
+                              ))}
+                              {topic.length === 0 && (
+                                <div className="text-xs text-stone-400 italic py-2">Belum ada topik yang dipilih...</div>
+                              )}
+                            </div>
+                            
+                            {/* AI Suggestions Box */}
+                            {!isManualTopic && suggestedTopics.length > 0 && (
+                              <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 shadow-inner relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-5">
+                                  <Bot className="w-24 h-24" />
+                                </div>
+                                
+                                <div className="flex items-center gap-2 mb-5">
+                                  <Sparkles className="w-4 h-4 text-emerald-500" />
+                                  <p className="text-[10px] uppercase tracking-widest font-black text-stone-400">Saran Topik dari AI</p>
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2.5 relative z-10">
+                                  {suggestedTopics.filter(t => !topic.includes(t)).map((t, i) => (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => setTopic([...topic, t])}
+                                      className="text-xs bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-stone-600 px-4 py-3 rounded-xl transition-all border border-stone-200 shadow-sm flex items-center gap-2 group font-medium"
+                                    >
+                                      <span className="text-emerald-500 font-bold group-hover:text-white transition-colors">+</span> 
+                                      {t}
+                                    </button>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsManualTopic(true)}
+                                    className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-3 rounded-xl transition-all border border-emerald-200 font-black flex items-center gap-2"
+                                  >
+                                    <X className="w-4 h-4 rotate-45" />
+                                    Ketik Manual
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Manual Input Field */}
+                            {(isManualTopic || suggestedTopics.length === 0) && (
+                              <div className="relative flex gap-3 animate-in slide-in-from-top-2 duration-300">
+                                <input
+                                  type="text"
+                                  value={topicInput}
+                                  onChange={(e) => setTopicInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && topicInput.trim()) {
+                                      e.preventDefault();
+                                      if (!topic.includes(topicInput.trim())) {
+                                        setTopic([...topic, topicInput.trim()]);
+                                      }
+                                      setTopicInput('');
+                                    }
+                                  }}
+                                  placeholder="Ketik topik lalu tekan Enter..."
+                                  className="flex-1 px-4 py-3 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-sm shadow-sm bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (topicInput.trim() && !topic.includes(topicInput.trim())) {
+                                      setTopic([...topic, topicInput.trim()]);
+                                      setTopicInput('');
+                                    }
+                                  }}
+                                  className="px-8 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-sm font-bold shadow-lg shadow-emerald-100 active:scale-95"
+                                >
+                                  Tambah
+                                </button>
+                                {suggestedTopics.length > 0 && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => setIsManualTopic(false)}
+                                    className="absolute right-32 top-1/2 -translate-y-1/2 text-[10px] text-stone-400 hover:text-stone-600 font-bold bg-stone-100 px-2 py-1 rounded-md border border-stone-200"
+                                  >
+                                    Batal
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 
-                {generationMode === 'bab' && (
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
-                    <label className="block text-sm font-medium text-emerald-800 mb-1">Jumlah Pertemuan *</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={jumlahPertemuan > 5 ? 'Lainnya' : jumlahPertemuan}
-                        onChange={(e) => {
-                          if (e.target.value === 'Lainnya') {
-                            setJumlahPertemuan(6); // Default to 6 when 'Lainnya' is selected
-                          } else {
-                            setJumlahPertemuan(Number(e.target.value));
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white"
-                      >
-                        <option value={2}>2 Pertemuan</option>
-                        <option value={3}>3 Pertemuan</option>
-                        <option value={4}>4 Pertemuan</option>
-                        <option value={5}>5 Pertemuan</option>
-                        <option value="Lainnya">Lainnya...</option>
-                      </select>
-                      {jumlahPertemuan > 5 && (
-                        <input
-                          type="number"
-                          min="6"
-                          max="20"
-                          value={jumlahPertemuan}
-                          onChange={(e) => setJumlahPertemuan(Number(e.target.value))}
-                          className="w-24 px-3 py-2 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white"
-                        />
-                      )}
-                    </div>
-                    <p className="text-xs text-emerald-600 mt-2">
-                      Sistem akan memanggil AI berkali-kali untuk menyusun materi per pertemuan secara detail. Proses ini akan memakan waktu sekitar 1 menit.
-                      {jumlahPertemuan > 5 && " Peringatan: Jumlah pertemuan yang banyak dapat memakan waktu lebih lama dan berisiko gagal."}
-                    </p>
-                  </div>
-                )}
+                {/* Mode Bab Option (Pertemuan) */}
+                <AnimatePresence mode="wait">
+                  {topic.length > 0 && generationMode === 'bab' && (
+                    <motion.div 
+                      key="pertemuan"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="pl-12 pt-4"
+                    >
+                      <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex items-center gap-6">
+                        <div className="flex-1">
+                          <label className="block text-sm font-bold text-emerald-800 mb-2">Jumlah Pertemuan *</label>
+                          <div className="flex gap-3">
+                            <select
+                              value={jumlahPertemuan > 5 ? 'Lainnya' : jumlahPertemuan}
+                              onChange={(e) => {
+                                if (e.target.value === 'Lainnya') {
+                                  setJumlahPertemuan(6);
+                                } else {
+                                  setJumlahPertemuan(Number(e.target.value));
+                                }
+                              }}
+                              className="flex-1 px-4 py-2.5 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm font-medium"
+                            >
+                              {[1, 2, 3, 4, 5].map(n => (
+                                <option key={n} value={n}>{n} Pertemuan</option>
+                              ))}
+                              <option value="Lainnya">Lainnya...</option>
+                            </select>
+                            
+                            {jumlahPertemuan > 5 && (
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={jumlahPertemuan}
+                                onChange={(e) => setJumlahPertemuan(Number(e.target.value))}
+                                className="w-24 px-4 py-2.5 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm font-medium"
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div className="hidden sm:block">
+                          <div className="w-16 h-16 bg-white rounded-2xl border border-emerald-100 flex items-center justify-center shadow-sm">
+                            <History className="w-8 h-8 text-emerald-600 opacity-20" />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
+
 
             {/* Lampiran Section */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
@@ -1719,6 +1872,27 @@ export default function RPMGenerator() {
                     </div>
 
                     <div className="w-px h-6 bg-stone-200 mx-1 hidden sm:block" />
+
+                    <div className="flex items-center gap-1 bg-emerald-50 p-1 rounded-lg border border-emerald-100">
+                      <button
+                        onClick={() => handleSaveToHistory('pdf')}
+                        disabled={isSavingToHistory}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors font-medium text-xs shadow-sm disabled:opacity-50"
+                        title="Simpan PDF ke Riwayat"
+                      >
+                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                        <span className="hidden lg:inline">Simpan PDF</span>
+                      </button>
+                      <button
+                        onClick={() => handleSaveToHistory('doc')}
+                        disabled={isSavingToHistory}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 transition-colors font-medium text-xs disabled:opacity-50"
+                        title="Simpan Word ke Riwayat"
+                      >
+                        {isSavingToHistory ? <Loader2 className="w-3 h-3 animate-spin" /> : <History className="w-3 h-3" />}
+                        <span className="hidden lg:inline">Simpan Word</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

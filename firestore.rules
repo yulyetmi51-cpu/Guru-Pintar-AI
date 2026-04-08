@@ -74,6 +74,22 @@ service cloud.firestore {
              data.babs is list;
     }
 
+    function isValidDaftarKelas(data) {
+      return data.keys().hasAll(['userId', 'tahunPelajaran', 'namaSekolah', 'kelas', 'namaGuru', 'createdAt', 'updatedAt']) &&
+             data.userId is string &&
+             data.tahunPelajaran is string &&
+             data.namaSekolah is string &&
+             data.kelas is string &&
+             data.namaGuru is string &&
+             (!('nss' in data) || data.nss is string) &&
+             (!('nip' in data) || data.nip is string) &&
+             (!('kecamatan' in data) || data.kecamatan is string) &&
+             (!('kota' in data) || data.kota is string) &&
+             (!('provinsi' in data) || data.provinsi is string) &&
+             data.createdAt is string &&
+             data.updatedAt is string;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated(); // Allow any authenticated user to read profiles (for admin panel or display names)
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
@@ -160,6 +176,13 @@ service cloud.firestore {
     match /notifications/{notifId} {
       allow read, update, delete: if isAdmin();
       allow create: if isAuthenticated();
+    }
+
+    match /daftar_kelas/{id} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidDaftarKelas(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidDaftarKelas(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
   }
 }

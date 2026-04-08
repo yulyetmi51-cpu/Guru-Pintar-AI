@@ -46,3 +46,19 @@ export interface AuthState {
   role: 'admin' | 'user' | null;
   user: User | null;
 }
+
+export interface DaftarKelasEntry {
+  id: string;
+  userId: string;
+  tahunPelajaran: string;
+  namaSekolah: string;
+  nss: string;
+  kelas: string;
+  namaGuru: string;
+  nip: string;
+  kecamatan: string;
+  kota: string;
+  provinsi: string;
+  createdAt: string;
+  updatedAt: string;
+}

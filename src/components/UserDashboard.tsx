@@ -30,9 +30,11 @@ import {
   ShieldAlert,
   History,
   Download,
-  ExternalLink
+  ExternalLink,
+  School
 } from 'lucide-react';
 import RPMGenerator from './RPMGenerator';
+import DaftarKelas from './DaftarKelas';
 import { User, HelpEntry, HistoryEntry } from '../types';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, doc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
@@ -236,7 +238,7 @@ function HistoryView({ userId }: { userId: string }) {
 }
 
 export default function UserDashboard({ onLogout, user, isAdminMode, onBackToAdmin }: UserDashboardProps) {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'rpm' | 'help' | 'history'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'rpm' | 'help' | 'history' | 'daftar_kelas'>('dashboard');
   const [activationCode, setActivationCode] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [activationMsg, setActivationMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -313,6 +315,24 @@ export default function UserDashboard({ onLogout, user, isAdminMode, onBackToAdm
     );
   }
 
+  if (currentView === 'daftar_kelas') {
+    return (
+      <div className="flex flex-col h-screen">
+        <div className="p-4 bg-white border-b flex items-center gap-4">
+          <button 
+            onClick={() => setCurrentView('dashboard')}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            &larr; Kembali ke Dashboard
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-8 bg-[#f8f9fa]">
+          <DaftarKelas user={user} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#f8f9fa] font-sans text-slate-800">
       {/* Sidebar */}
@@ -368,6 +388,19 @@ export default function UserDashboard({ onLogout, user, isAdminMode, onBackToAdm
               >
                 <FileText className="w-5 h-5" />
                 Buat RPM
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => setCurrentView('daftar_kelas')}
+                className={`w-full flex items-center gap-3 px-6 py-3 font-medium transition-colors ${
+                  (currentView as string) === 'daftar_kelas'
+                    ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600 font-bold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                }`}
+              >
+                <School className="w-5 h-5" />
+                Daftar Kelas
               </button>
             </li>
             <li>

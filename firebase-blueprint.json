@@ -84,6 +84,26 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["jenjang", "grade", "subject", "babs"]
+    },
+    "DaftarKelas": {
+      "title": "DaftarKelas",
+      "description": "Information about a class list.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "tahunPelajaran": { "type": "string" },
+        "namaSekolah": { "type": "string" },
+        "nss": { "type": "string" },
+        "kelas": { "type": "string" },
+        "namaGuru": { "type": "string" },
+        "nip": { "type": "string" },
+        "kecamatan": { "type": "string" },
+        "kota": { "type": "string" },
+        "provinsi": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "tahunPelajaran", "namaSekolah", "kelas", "namaGuru"]
     }
   },
   "firestore": {
@@ -106,6 +126,10 @@
     "curriculum/{curriculumId}": {
       "schema": { "$ref": "#/entities/Curriculum" },
       "description": "Stores curriculum structures."
+    },
+    "daftar_kelas/{id}": {
+      "schema": { "$ref": "#/entities/DaftarKelas" },
+      "description": "Stores class list information."
     }
   }
 }
