@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test-docx": "node test-search.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -24,7 +25,6 @@
     "fs-extra": "^11.3.4",
     "glob": "^13.0.6",
     "html-docx-js-typescript": "^0.1.5",
-    "html-to-docx": "^1.8.0",
     "html2pdf.js": "^0.14.0",
     "jodit-react": "^5.3.21",
     "lucide-react": "^0.546.0",

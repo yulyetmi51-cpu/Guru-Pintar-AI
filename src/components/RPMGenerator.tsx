@@ -7,7 +7,6 @@ import { BookOpen, Loader2, Copy, Check, Printer, FileText, Download, Settings2,
 import { doc, runTransaction, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { asBlob } from 'html-docx-js-typescript';
 
 const inlineImages = async (html: string): Promise<string> => {
   const tempDiv = document.createElement('div');
@@ -665,7 +664,18 @@ export default function RPMGenerator() {
           </html>
         `;
         
-        blob = await asBlob(docxHtml, { orientation: orientation as 'portrait' | 'landscape', margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }) as Blob;
+        const response = await fetch('/api/generate-docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: docxHtml })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.details || errData.error || 'Failed to generate DOCX');
+        }
+        
+        blob = await response.blob();
       } else {
         extension = 'pdf';
         const inlinedContent = await inlineImages(generatedRPM);
@@ -829,8 +839,18 @@ export default function RPMGenerator() {
         </html>
       `;
 
-      // Use html-docx-js-typescript in the browser
-      const blob = await asBlob(docxHtml, { orientation: orientation as 'portrait' | 'landscape', margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }) as Blob;
+      const response = await fetch('/api/generate-docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: docxHtml })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || 'Failed to generate DOCX');
+      }
+
+      const blob = await response.blob();
       
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

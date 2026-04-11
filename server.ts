@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import { glob } from "glob";
 import { Octokit } from "octokit";
 import dotenv from "dotenv";
-import HTMLtoDOCX from "html-to-docx";
+import { asBlob } from "html-docx-js-typescript";
 import puppeteer from "puppeteer";
 
 dotenv.config();
@@ -88,14 +88,7 @@ async function startServer() {
         return res.status(400).json({ error: "HTML content is required" });
       }
 
-      const fileBuffer = await HTMLtoDOCX(html, null, {
-        margins: {
-          top: 1440,
-          right: 1440,
-          bottom: 1440,
-          left: 1440,
-        }
-      });
+      const fileBuffer = await asBlob(html, { margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }) as Buffer;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', 'attachment; filename="document.docx"');
